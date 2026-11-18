@@ -38,18 +38,18 @@ class AndroidInstalledApps(private val context: Context) : InstalledAppsSource {
             }
     }
 
-    private fun systemCategoryKey(info: ApplicationInfo): String? {
-        if (Build.VERSION.SDK_INT < 26) return null
-        return when (info.category) {
-            ApplicationInfo.CATEGORY_GAME -> "games"
-            ApplicationInfo.CATEGORY_AUDIO -> "audio"
-            ApplicationInfo.CATEGORY_VIDEO -> "video"
-            ApplicationInfo.CATEGORY_IMAGE -> "photos"
-            ApplicationInfo.CATEGORY_SOCIAL -> "social"
-            ApplicationInfo.CATEGORY_NEWS -> "news"
-            ApplicationInfo.CATEGORY_MAPS -> "maps"
-            ApplicationInfo.CATEGORY_PRODUCTIVITY -> "productivity"
-            else -> null
+    companion object {
+        /** Android's own category as an [io.disruption.focal.core.apps.AppCategory] key, if it maps to one. */
+        fun systemCategoryKey(info: ApplicationInfo): String? {
+            if (Build.VERSION.SDK_INT < 26) return null
+            return when (info.category) {
+                ApplicationInfo.CATEGORY_GAME -> "games"
+                ApplicationInfo.CATEGORY_AUDIO -> "music"
+                ApplicationInfo.CATEGORY_VIDEO -> "video"
+                ApplicationInfo.CATEGORY_SOCIAL -> "social"
+                ApplicationInfo.CATEGORY_NEWS -> "news"
+                else -> null
+            }
         }
     }
 }

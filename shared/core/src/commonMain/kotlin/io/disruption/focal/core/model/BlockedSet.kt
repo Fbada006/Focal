@@ -28,6 +28,13 @@ data class BlockedSet(
         domains = domains - other.domains,
     )
 
+    /**
+     * Whether the app is blocked, picked by package or covered by one of [appCategories]. [category]
+     * is the app's App Category key, resolved by `AppCategoryResolver`.
+     */
+    fun blocksApp(packageName: String, category: String?): Boolean =
+        packageName in apps || (category != null && category in appCategories)
+
     /** Whether visiting [host] (a hostname or URL) is blocked by one of [domains]. */
     fun blocksWebsite(host: String): Boolean = Domains.anyMatches(domains, host)
 

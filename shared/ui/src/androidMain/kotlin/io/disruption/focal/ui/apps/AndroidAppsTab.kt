@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.disruption.focal.ui.blocklists.BlockListEditorState
+import io.disruption.focal.ui.components.SectionTitle
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -42,10 +43,24 @@ fun AndroidAppsTab(
             CircularProgressIndicator(Modifier.padding(24.dp))
         }
         LazyColumn {
+            item { SectionTitle("App Categories") }
+            items(state.categories, key = { "category-${it.key}" }) { category ->
+                ListItem(
+                    headlineContent = { Text(category.label) },
+                    supportingContent = { Text("${category.installedCount} installed, and any you install later") },
+                    trailingContent = { Checkbox(checked = category.selected, onCheckedChange = null) },
+                    modifier = Modifier.toggleable(
+                        value = category.selected,
+                        onValueChange = { viewModel.onIntent(AppPickerIntent.CategoryToggled(category.key)) },
+                    ),
+                )
+            }
+            item { SectionTitle("Apps") }
             items(state.apps, key = { it.packageName }) { app ->
                 ListItem(
                     leadingContent = { AppIcon(app.packageName) },
                     headlineContent = { Text(app.label) },
+                    supportingContent = app.category?.let { { Text(it) } },
                     trailingContent = { Checkbox(checked = app.selected, onCheckedChange = null) },
                     modifier = Modifier.toggleable(
                         value = app.selected,
