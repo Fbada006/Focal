@@ -13,7 +13,7 @@ Focal is an Opal-style focus app for Android and iOS: it blocks distracting apps
 
 - `shared/core`: pure Kotlin domain rules and the `BlockingEngine` interface. No Compose, Room or platform imports.
 - `shared/data`: Room (KMP), repositories, DataStore, curated data.
-- `shared/ui`: Compose Multiplatform screens and view models.
+- `shared/ui`: Compose Multiplatform screens and view models, using hand-rolled MVI (State / Intent / Effect, ADR 0011).
 - `shared`: umbrella module that exports the single iOS framework.
 - `androidApp`: Android app and Android blocking engine.
 - `iosApp`: iOS app, SwiftUI pieces and Swift-only Screen Time extensions.
