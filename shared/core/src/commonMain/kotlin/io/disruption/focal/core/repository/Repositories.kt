@@ -7,6 +7,7 @@ import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
 import kotlinx.coroutines.flow.Flow
+import kotlin.time.Instant
 
 /** Block Lists, persisted on the device (ADR 0003, ADR 0009). */
 interface BlockListRepository {
@@ -24,6 +25,9 @@ interface FocusSessionRepository {
     /** Every session, newest first. */
     fun observeAll(): Flow<List<FocusSession>>
     suspend fun getRunning(): List<FocusSession>
+
+    /** Sessions started by [scheduleId] at or after [since], running or finished. */
+    suspend fun getStartedBySchedule(scheduleId: ScheduleId, since: Instant): List<FocusSession>
     suspend fun get(id: FocusSessionId): FocusSession?
     suspend fun save(session: FocusSession)
 }

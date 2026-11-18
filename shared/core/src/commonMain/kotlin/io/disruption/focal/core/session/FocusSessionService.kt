@@ -9,6 +9,9 @@ import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
+import io.disruption.focal.core.model.Schedule
+import io.disruption.focal.core.schedule.ScheduleWindows
+import kotlinx.datetime.TimeZone
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.core.repository.BlockListRepository
@@ -90,6 +93,41 @@ class FocusSessionService(
         }
         if (session.strictness != Strictness.Normal) return EndResult.NotAllowed(session.strictness)
         EndResult.Ended(finish(session, Outcome.EndedEarly, now))
+    }
+
+    /**
+     * Start a Focus Session for every switched-on Schedule whose window contains now and which
+     * hasn't already started one in this window (stories 52, 55–57). Call it when a Schedule's start
+     * alarm fires, when Focal starts and after the device boots.
+     *
+     * A start that was missed (phone off) starts now and still ends at the window's end; a window
+     * that is already over starts nothing. Overlapping Schedules each start their own session. A
+     * window gets at most one session, so a session ended early is not started again.
+     */
+    suspend fun evaluateSchedules(schedules: List<Schedule>, zone: TimeZone): List<FocusSession> = mutex.withLock {
+        val now = clock.now()
+        val started = mutableListOf<FocusSession>()
+        for (schedule in schedules.filter { it.enabled }) {
+            val window = ScheduleWindows.current(schedule, now, zone) ?: continue
+            if (sessions.getStartedBySchedule(schedule.id, since = window.start).isNotEmpty()) continue
+            val blockList = blockLists.get(schedule.blockListId)
+            if (blockList == null || blockList.blocked.isEmpty) continue
+
+            val session = FocusSession(
+                id = FocusSessionId(newId()),
+                blockListId = blockList.id,
+                name = schedule.name,
+                strictness = schedule.strictness,
+                startedAt = now,
+                plannedEnd = window.end,
+                blocked = blockList.blocked,
+                scheduleId = schedule.id,
+            )
+            sessions.save(session)
+            engine.apply(session)
+            started += session
+        }
+        started
     }
 
     /**

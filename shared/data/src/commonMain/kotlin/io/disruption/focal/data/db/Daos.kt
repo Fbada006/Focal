@@ -31,6 +31,9 @@ interface FocusSessionDao {
     @Query("SELECT * FROM focus_sessions WHERE outcome IS NULL ORDER BY plannedEnd")
     suspend fun getRunning(): List<FocusSessionEntity>
 
+    @Query("SELECT * FROM focus_sessions WHERE scheduleId = :scheduleId AND startedAt >= :since")
+    suspend fun getStartedBySchedule(scheduleId: String, since: Long): List<FocusSessionEntity>
+
     @Query("SELECT * FROM focus_sessions WHERE id = :id")
     suspend fun get(id: String): FocusSessionEntity?
 
