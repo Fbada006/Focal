@@ -15,6 +15,11 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
   - Only act on the committed URL, not partial text while the user is typing in the address bar (e.g. check when the bar loses focus or the page's content changes).
 - **`UsageStatsManager`** (usage access) is *not* a blocking signal — polling `queryEvents` for `ACTIVITY_RESUMED` is too slow. Possible later uses: fallback when accessibility is off, a cross-check, and per-app screen-time stats. Not needed for v1 unless stats require it.
 
+### Package visibility
+
+- The Apps tab lists launchable apps via a `<queries>` entry for the `MAIN`/`LAUNCHER` intent. Every app a user can open from the launcher is visible this way, and those are the only apps worth blocking, so Focal does **not** request `QUERY_ALL_PACKAGES` (which Play restricts to apps whose core purpose needs it).
+- Accessibility events carry the foreground package name regardless of package visibility, so detection does not depend on it.
+
 ## 2. Block (the Shield) without flicker
 
 - Draw the Shield as a `TYPE_ACCESSIBILITY_OVERLAY` window from the accessibility service. This needs no extra permission (unlike `SYSTEM_ALERT_WINDOW` / `TYPE_APPLICATION_OVERLAY`).
