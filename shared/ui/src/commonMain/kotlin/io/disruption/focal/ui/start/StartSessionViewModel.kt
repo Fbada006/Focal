@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import io.disruption.focal.core.blocklist.BlockListService
 import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.core.session.SessionLength
 import io.disruption.focal.core.session.StartResult
@@ -29,9 +30,11 @@ data class StartSessionState(
     val strictness: Strictness = Strictness.Normal,
     val error: String? = null,
     val starting: Boolean = false,
+    /** A required permission is missing, so a session couldn't block anything (story 10). */
+    val permissionMissing: Boolean = false,
 ) {
     val canStart: Boolean
-        get() = !starting && blockLists.any { it.id == selectedBlockListId && !it.isEmpty }
+        get() = !starting && !permissionMissing && blockLists.any { it.id == selectedBlockListId && !it.isEmpty }
 }
 
 sealed interface StartSessionIntent {
@@ -54,9 +57,19 @@ class StartSessionViewModel(
     private val sessions: FocusSessionService,
     private val clock: Clock,
     private val timeZone: TimeZoneProvider,
+    private val permissions: PermissionGateway,
 ) : MviViewModel<StartSessionState, StartSessionIntent, StartSessionEffect>(StartSessionState()) {
 
     init {
+        viewModelScope.launch {
+            val missing = permissions.missing().isNotEmpty()
+            setState {
+                copy(
+                    permissionMissing = missing,
+                    error = if (missing) "Fix Focal's permissions on Home before starting a session." else error,
+                )
+            }
+        }
         viewModelScope.launch {
             blockLists.observeAll().collect { lists ->
                 val options = lists.map { BlockListOption(it.id.value, it.name, it.blocked.isEmpty) }

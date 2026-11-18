@@ -7,7 +7,10 @@ import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.schedule.ScheduleService
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.core.time.TimeZoneProvider
+import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.testing.FakeClock
+import io.disruption.focal.testing.FakePermissionGateway
+import io.disruption.focal.testing.InMemoryAppPreferences
 import io.disruption.focal.testing.InMemoryBlockListRepository
 import io.disruption.focal.testing.InMemoryFocusSessionRepository
 import io.disruption.focal.testing.InMemoryScheduleRepository
@@ -28,5 +31,7 @@ class SessionUiFixture(vararg lists: BlockList = arrayOf(social, empty)) {
     val sessions = FocusSessionService(blockListRepository, sessionRepository, engine, clock, newId = { "s${++ids}" })
     val scheduleRepository = InMemoryScheduleRepository()
     val blockLists = BlockListService(blockListRepository, sessionRepository, sessions, schedules = scheduleRepository)
+    val permissions = FakePermissionGateway(granted = Permission.entries.toSet())
+    val preferences = InMemoryAppPreferences()
     val schedules = ScheduleService(scheduleRepository, blockListRepository, sessions, zone, newId = { "sch" })
 }

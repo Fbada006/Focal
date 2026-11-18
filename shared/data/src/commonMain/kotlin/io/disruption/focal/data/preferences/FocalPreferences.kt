@@ -5,17 +5,13 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import io.disruption.focal.core.repository.AppPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import okio.Path.Companion.toPath
 
-/** Small app preferences, kept in DataStore rather than the database (ADR 0009). */
-interface FocalPreferences {
-    val onboardingCompleted: Flow<Boolean>
-    suspend fun setOnboardingCompleted(completed: Boolean)
-}
-
-class DataStoreFocalPreferences(private val store: DataStore<Preferences>) : FocalPreferences {
+/** [AppPreferences] in DataStore (ADR 0009). */
+class DataStoreFocalPreferences(private val store: DataStore<Preferences>) : AppPreferences {
     override val onboardingCompleted: Flow<Boolean> = store.data.map { it[ONBOARDING_COMPLETED] ?: false }
 
     override suspend fun setOnboardingCompleted(completed: Boolean) {

@@ -6,6 +6,7 @@ import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
+import io.disruption.focal.core.repository.AppPreferences
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
 import io.disruption.focal.core.repository.ScheduleRepository
@@ -49,4 +50,12 @@ class InMemoryScheduleRepository(vararg initial: Schedule) : ScheduleRepository 
     override suspend fun get(id: ScheduleId): Schedule? = schedules.value[id]
     override suspend fun save(schedule: Schedule) = schedules.update { it + (schedule.id to schedule) }
     override suspend fun delete(id: ScheduleId) = schedules.update { it - id }
+}
+
+class InMemoryAppPreferences(onboardingCompleted: Boolean = false) : AppPreferences {
+    private val completed = MutableStateFlow(onboardingCompleted)
+    override val onboardingCompleted: Flow<Boolean> = completed
+    override suspend fun setOnboardingCompleted(completed: Boolean) {
+        this.completed.value = completed
+    }
 }

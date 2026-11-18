@@ -2,6 +2,7 @@ package io.disruption.focal
 
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.blocklist.BlockListService
+import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.schedule.ScheduleService
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.core.session.SessionLock
@@ -26,17 +27,22 @@ val coreModule: Module = module {
 }
 
 /**
- * Start Koin with every shared module plus the app's [blockingEngine]. Android calls this from its
+ * Start Koin with every shared module plus the app's [blockingEngine] and [permissionGateway].
+ * Android calls this from its
  * `Application`; iOS through [startFocal].
  */
 fun initKoin(
     blockingEngine: BlockingEngine,
+    permissionGateway: PermissionGateway,
     platformModules: List<Module> = emptyList(),
     appDeclaration: KoinAppDeclaration = {},
 ): KoinApplication = startKoin {
     appDeclaration()
     modules(
-        module { single<BlockingEngine> { blockingEngine } },
+        module {
+            single<BlockingEngine> { blockingEngine }
+            single<PermissionGateway> { permissionGateway }
+        },
         coreModule,
         dataModule,
         uiModule,

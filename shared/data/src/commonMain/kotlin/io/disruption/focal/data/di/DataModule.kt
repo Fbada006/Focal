@@ -1,6 +1,7 @@
 package io.disruption.focal.data.di
 
 import io.disruption.focal.core.apps.AppCategoryResolver
+import io.disruption.focal.core.repository.AppPreferences
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
 import io.disruption.focal.core.repository.ScheduleRepository
@@ -9,7 +10,6 @@ import io.disruption.focal.data.curated.CuratedAppCategories
 import io.disruption.focal.data.curated.CuratedSuggestedWebsites
 import io.disruption.focal.data.db.FocalDatabase
 import io.disruption.focal.data.preferences.DataStoreFocalPreferences
-import io.disruption.focal.data.preferences.FocalPreferences
 import io.disruption.focal.data.repository.RoomBlockListRepository
 import io.disruption.focal.data.repository.RoomFocusSessionRepository
 import io.disruption.focal.data.repository.RoomScheduleRepository
@@ -27,7 +27,7 @@ val dataModule: Module = module {
     single<BlockListRepository> { RoomBlockListRepository(get()) }
     single<FocusSessionRepository> { RoomFocusSessionRepository(get()) }
     single<ScheduleRepository> { RoomScheduleRepository(get()) }
-    single<FocalPreferences> { DataStoreFocalPreferences(get()) }
+    single<AppPreferences> { DataStoreFocalPreferences(get()) }
     single<SuggestedWebsitesCatalog> { CuratedSuggestedWebsites }
     single { AppCategoryResolver(CuratedAppCategories.byPackage) }
 }

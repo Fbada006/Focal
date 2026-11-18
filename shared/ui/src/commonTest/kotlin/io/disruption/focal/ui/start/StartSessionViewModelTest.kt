@@ -17,7 +17,7 @@ import kotlin.time.Instant
 
 class StartSessionViewModelTest : MainDispatcherTest() {
     private val f = SessionUiFixture()
-    private fun vm() = StartSessionViewModel(f.blockLists, f.sessions, f.clock, f.zone)
+    private fun vm() = StartSessionViewModel(f.blockLists, f.sessions, f.clock, f.zone, f.permissions)
 
     @Test
     fun preselectsTheFirstNonEmptyBlockList() = runTest {
