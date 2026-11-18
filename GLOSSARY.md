@@ -47,7 +47,7 @@ A 5-minute pause in blocking during a Delayed Focus Session, after which blockin
 _Avoid_: Pause, snooze, unlock
 
 **Locked**:
-A Strictness under which the Focus Session cannot be ended, edited or shortened until it runs out.
+A Strictness under which the Focus Session cannot be ended, shortened or otherwise weakened until it runs out. It can still be made stricter.
 _Avoid_: Deep Focus, hardcore
 
 **Schedule**:
