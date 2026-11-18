@@ -3,6 +3,7 @@ package io.disruption.focal.core.session
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.ios.ExtensionEvent
 import io.disruption.focal.core.model.BlockedSet
+import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
@@ -129,6 +130,27 @@ class FocusSessionService(
     }
 
     /**
+     * Take a 5-minute Break from a Delayed session: blocking for this session is lifted until the
+     * Break ends, then the engine restores it on its own, even if Focal isn't running. Breaks don't
+     * move the planned end or change the outcome. At most three per session; only from Focal,
+     * never from the Shield.
+     */
+    suspend fun takeBreak(id: FocusSessionId): BreakResult = mutex.withLock {
+        val session = sessions.get(id)?.takeIf { it.isRunning } ?: return BreakResult.NotRunning
+        val now = clock.now()
+        if (now >= session.plannedEnd) return BreakResult.NotRunning
+        if (session.strictness != Strictness.Delayed) return BreakResult.NotAllowed(session.strictness)
+        if (session.currentBreak(now) != null) return BreakResult.AlreadyOnBreak
+        if (session.breaksLeft == 0) return BreakResult.NoBreaksLeft
+
+        val endsAt = minOf(now + FocusSession.BREAK_LENGTH, session.plannedEnd)
+        val updated = session.copy(breaks = session.breaks + Break(startedAt = now, endsAt = endsAt))
+        sessions.save(updated)
+        engine.pauseUntil(id, endsAt)
+        BreakResult.Started(updated, endsAt)
+    }
+
+    /**
      * Record every running session whose planned end has passed as Completed and lift its
      * blocking. Returns the sessions it completed.
      */
@@ -141,8 +163,12 @@ class FocusSessionService(
      */
     suspend fun restore(): List<FocusSession> = mutex.withLock {
         completeDueLocked()
+        val now = clock.now()
         val running = sessions.getRunning()
-        running.forEach { engine.apply(it) }
+        running.forEach { session ->
+            engine.apply(session)
+            session.currentBreak(now)?.let { engine.pauseUntil(session.id, it.endsAt) }
+        }
         running
     }
 

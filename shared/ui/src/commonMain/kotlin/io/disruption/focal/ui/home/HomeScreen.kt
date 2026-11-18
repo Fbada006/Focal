@@ -80,7 +80,11 @@ fun HomeScreen(
                 modifier = Modifier.padding(horizontal = 16.dp),
             ) {
                 items(state.running, key = { it.id }) { row ->
-                    RunningSessionCard(row, onEnd = { onIntent(HomeIntent.EndClicked(row.id)) }) { sessionActions(row) }
+                    RunningSessionCard(
+                        row = row,
+                        onEnd = { onIntent(HomeIntent.EndClicked(row.id)) },
+                        onTakeBreak = { onIntent(HomeIntent.TakeBreakClicked(row.id)) },
+                    ) { sessionActions(row) }
                 }
             }
         }
@@ -88,7 +92,12 @@ fun HomeScreen(
 }
 
 @Composable
-private fun RunningSessionCard(row: RunningSessionRow, onEnd: () -> Unit, actions: @Composable () -> Unit) {
+private fun RunningSessionCard(
+    row: RunningSessionRow,
+    onEnd: () -> Unit,
+    onTakeBreak: () -> Unit,
+    actions: @Composable () -> Unit,
+) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(row.name, style = MaterialTheme.typography.titleMedium)
@@ -101,10 +110,19 @@ private fun RunningSessionCard(row: RunningSessionRow, onEnd: () -> Unit, action
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(row.timeLeft, style = MaterialTheme.typography.headlineSmall)
+            row.onBreak?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            row.breaksLeft?.let { left ->
+                Text(
+                    "${if (left == 1) "1 Break" else "$left Breaks"} left",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (row.canEnd) {
                     OutlinedButton(onClick = onEnd) { Text(if (row.strictness == Strictness.Normal) "End session" else "End early") }
                 }
+                if (row.canTakeBreak) TextButton(onClick = onTakeBreak) { Text("Take a 5-minute Break") }
                 actions()
             }
         }

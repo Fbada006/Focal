@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -79,5 +80,35 @@ class HomeViewModelTest : MainDispatcherTest() {
         assertEquals("2 h 05 min left", formatTimeLeft(125.minutes))
         assertEquals("59 s left", formatTimeLeft(59.seconds))
         assertEquals("Ending…", formatTimeLeft(0.seconds))
+    }
+}
+
+class HomeBreaksTest : MainDispatcherTest() {
+    private val f = SessionUiFixture()
+    private val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    @Test
+    fun delayedSessionsShowBreaksLeftAndCanTakeOne() = runTest {
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Delayed)
+        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        assertEquals(3, vm.state.value.running.single().breaksLeft)
+        assertTrue(vm.state.value.running.single().canTakeBreak)
+
+        vm.onIntent(HomeIntent.TakeBreakClicked("s1"))
+
+        val row = vm.state.value.running.single()
+        assertEquals(2, row.breaksLeft)
+        assertEquals("On a Break · 5 min 00 s left", row.onBreak)
+        assertEquals(false, row.canTakeBreak)
+        assertEquals("1 h 00 min left", row.timeLeft, "a Break doesn't move the end")
+    }
+
+    @Test
+    fun breaksAreNotOfferedForNormalOrLockedSessions() = runTest {
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Normal)
+        f.sessions.start(social.id, SessionLength.For(2.hours), Strictness.Locked)
+        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+
+        assertTrue(vm.state.value.running.none { it.canTakeBreak || it.breaksLeft != null })
     }
 }

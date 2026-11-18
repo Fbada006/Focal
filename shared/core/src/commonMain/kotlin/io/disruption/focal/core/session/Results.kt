@@ -39,3 +39,13 @@ sealed interface CountdownResult {
 }
 
 data class IngestReport(val sessionsStarted: Int, val sessionsCompleted: Int, val breaksEnded: Int = 0)
+
+sealed interface BreakResult {
+    data class Started(val session: FocusSession, val endsAt: Instant) : BreakResult
+    data object NotRunning : BreakResult
+
+    /** Breaks are only for Delayed sessions. */
+    data class NotAllowed(val strictness: Strictness) : BreakResult
+    data object NoBreaksLeft : BreakResult
+    data object AlreadyOnBreak : BreakResult
+}

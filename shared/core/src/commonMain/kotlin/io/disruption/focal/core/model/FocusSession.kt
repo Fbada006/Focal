@@ -30,6 +30,17 @@ data class FocusSession(
     val focusDuration: Duration? get() = endedAt?.let { it - startedAt }
 
     fun timeLeft(now: Instant): Duration = (plannedEnd - now).coerceAtLeast(Duration.ZERO)
+
+    /** The Break in progress at [now], if any. */
+    fun currentBreak(now: Instant): Break? = breaks.lastOrNull()?.takeIf { now >= it.startedAt && now < it.endsAt }
+
+    val breaksLeft: Int get() = (MAX_BREAKS - breaks.size).coerceAtLeast(0)
+
+    companion object {
+        /** Fixed in v1: a Break lasts 5 minutes and a session allows at most three. */
+        val BREAK_LENGTH: Duration = Duration.parse("5m")
+        const val MAX_BREAKS = 3
+    }
 }
 
 /** A pause in blocking during a Delayed Focus Session. */
