@@ -16,3 +16,6 @@ data object StartSession
 
 @Serializable
 data class ExitCountdown(val sessionId: String)
+
+@Serializable
+data class EditSession(val sessionId: String)

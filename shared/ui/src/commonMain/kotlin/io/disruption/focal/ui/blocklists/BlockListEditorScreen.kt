@@ -90,6 +90,14 @@ fun BlockListEditorScreen(
                     .padding(16.dp)
                     .onFocusChanged { if (!it.isFocused && !state.loading) onIntent(BlockListEditorIntent.NameCommitted) },
             )
+            state.notice?.let { notice ->
+                androidx.compose.material3.Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(notice, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onIntent(BlockListEditorIntent.NoticeDismissed) }) { Text("OK") }
+                    }
+                }
+            }
             PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
                 EditorTab.entries.forEach { tab ->
                     Tab(

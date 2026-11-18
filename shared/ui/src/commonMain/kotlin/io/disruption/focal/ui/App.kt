@@ -9,9 +9,11 @@ import io.disruption.focal.ui.blocklists.AppsTabContent
 import io.disruption.focal.ui.blocklists.BlockListEditorRoute
 import io.disruption.focal.ui.blocklists.BlockListsRoute
 import io.disruption.focal.ui.countdown.ExitCountdownRoute
+import io.disruption.focal.ui.edit.EditSessionRoute
 import io.disruption.focal.ui.home.HomeRoute
 import io.disruption.focal.ui.navigation.BlockListEditor
 import io.disruption.focal.ui.navigation.BlockLists
+import io.disruption.focal.ui.navigation.EditSession
 import io.disruption.focal.ui.navigation.ExitCountdown
 import io.disruption.focal.ui.navigation.Home
 import io.disruption.focal.ui.navigation.StartSession
@@ -33,7 +35,11 @@ fun App(platform: PlatformContent = PlatformContent()) {
                     onOpenStart = { nav.navigate(StartSession) },
                     onOpenBlockLists = { nav.navigate(BlockLists) },
                     onOpenExitCountdown = { nav.navigate(ExitCountdown(it)) },
+                    onOpenEditSession = { nav.navigate(EditSession(it)) },
                 )
+            }
+            composable<EditSession> { entry ->
+                EditSessionRoute(entry.toRoute<EditSession>().sessionId, onClose = { nav.popBackStack() })
             }
             composable<ExitCountdown> { entry ->
                 ExitCountdownRoute(entry.toRoute<ExitCountdown>().sessionId, onClose = { nav.popBackStack() })

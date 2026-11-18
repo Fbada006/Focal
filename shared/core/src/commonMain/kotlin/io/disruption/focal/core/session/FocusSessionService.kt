@@ -2,6 +2,7 @@ package io.disruption.focal.core.session
 
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.ios.ExtensionEvent
+import io.disruption.focal.core.model.BlockList
 import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.BlockListId
@@ -148,6 +149,65 @@ class FocusSessionService(
         sessions.save(updated)
         engine.pauseUntil(id, endsAt)
         BreakResult.Started(updated, endsAt)
+    }
+
+    /**
+     * Change a running session's end time and/or Strictness. A running session can only get
+     * stricter (ADR 0007): a later end and a higher Strictness always apply at once; an earlier end
+     * or a lower Strictness is refused for Delayed and Locked sessions. Normal sessions accept any
+     * edit, since they could be ended anyway.
+     */
+    suspend fun edit(
+        id: FocusSessionId,
+        plannedEnd: Instant? = null,
+        strictness: Strictness? = null,
+    ): EditResult = mutex.withLock {
+        val session = sessions.get(id)?.takeIf { it.isRunning } ?: return EditResult.NotRunning
+        val now = clock.now()
+        if (now >= session.plannedEnd) return EditResult.NotRunning
+        val weakeningAllowed = session.strictness == Strictness.Normal
+        val newEnd = plannedEnd ?: session.plannedEnd
+        val newStrictness = strictness ?: session.strictness
+
+        if (newEnd <= now) return EditResult.Refused(EditRefusal.EndNotInFuture)
+        if (newEnd < session.plannedEnd && !weakeningAllowed) return EditResult.Refused(EditRefusal.Shorten)
+        if (session.strictness.isStricterThan(newStrictness) && !weakeningAllowed) {
+            return EditResult.Refused(EditRefusal.LowerStrictness)
+        }
+
+        val updated = session.copy(plannedEnd = newEnd, strictness = newStrictness)
+        if (updated != session) {
+            sessions.save(updated)
+            engine.apply(updated)
+            session.currentBreak(now)?.let { engine.pauseUntil(id, minOf(it.endsAt, newEnd)) }
+        }
+        EditResult.Applied(updated)
+    }
+
+    /**
+     * Bring running sessions that use [blockList] in line with an edit to it (ADR 0007). Additions
+     * are merged into each session's own copy and applied at once. Removals apply at once to Normal
+     * sessions; Delayed and Locked sessions keep blocking them until they end.
+     */
+    suspend fun blockListChanged(blockList: BlockList): BlockListChangeReport = mutex.withLock {
+        val tightened = mutableListOf<FocusSession>()
+        val deferred = mutableListOf<String>()
+        val now = clock.now()
+        for (session in sessions.getRunning().filter { it.blockListId == blockList.id && it.plannedEnd > now }) {
+            val newBlocked = if (session.strictness == Strictness.Normal) {
+                blockList.blocked
+            } else {
+                if (!blockList.blocked.containsAll(session.blocked)) deferred += session.name
+                session.blocked + blockList.blocked
+            }
+            if (newBlocked == session.blocked) continue
+            val updated = session.copy(blocked = newBlocked)
+            sessions.save(updated)
+            engine.apply(updated)
+            session.currentBreak(now)?.let { engine.pauseUntil(session.id, it.endsAt) }
+            if (!session.blocked.containsAll(newBlocked)) tightened += updated
+        }
+        BlockListChangeReport(tightened, deferred)
     }
 
     /**

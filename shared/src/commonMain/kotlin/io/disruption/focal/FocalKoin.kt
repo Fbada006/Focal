@@ -20,7 +20,7 @@ val coreModule: Module = module {
     single { TimeZoneProvider.System }
     single { SessionLock() }
     single { FocusSessionService(get(), get(), get(), get(), lock = get()) }
-    single { BlockListService(get(), get(), lock = get()) }
+    single { BlockListService(get(), get(), get(), lock = get()) }
 }
 
 /**

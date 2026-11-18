@@ -39,7 +39,7 @@ class BlockListConcurrencyTest {
         val sessions = InMemoryFocusSessionRepository()
         val lock = SessionLock()
         val sessionService = FocusSessionService(blockLists, sessions, RecordingBlockingEngine(), FakeClock(), lock = lock)
-        val listService = BlockListService(blockLists, sessions, lock = lock)
+        val listService = BlockListService(blockLists, sessions, sessionService, lock = lock)
 
         // The delete checks for running sessions first; the start lands while it is still deciding.
         val delete = async { listService.delete(socialList.id) }
