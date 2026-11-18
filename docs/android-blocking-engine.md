@@ -9,7 +9,10 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
 - **Apps**: an `AccessibilityService` listening for `TYPE_WINDOW_STATE_CHANGED`. The event carries the package name, arrives instantly, and costs nothing when nothing changes.
 - Keep the service config narrow: only the event types we need.
 - Ignore noise packages that also fire window events: Focal itself, the launcher, System UI, the keyboard (IME).
-- **Websites**: same service, with `canRetrieveWindowContent` enabled, reading the address bar of supported browsers via a per-browser lookup table.
+- **Websites**: same service, with `canRetrieveWindowContent` enabled, reading the address bar of supported browsers via a per-browser lookup table (package name → address-bar view ID).
+  - `canRetrieveWindowContent` only grants access to the view tree; it doesn't decide *when* we look. Following a link, switching tabs or typing a new URL happens inside the same browser window and need not fire `TYPE_WINDOW_STATE_CHANGED`.
+  - So for supported browser packages, also listen for `TYPE_WINDOW_CONTENT_CHANGED` and `TYPE_VIEW_TEXT_CHANGED`, and re-check the address bar on each. Scope these to the browser packages (via `packageNames` or an early filter) and debounce them, since content-change events are frequent.
+  - Only act on the committed URL, not partial text while the user is typing in the address bar (e.g. check when the bar loses focus or the page's content changes).
 - **`UsageStatsManager`** (usage access) is *not* a blocking signal — polling `queryEvents` for `ACTIVITY_RESUMED` is too slow. Possible later uses: fallback when accessibility is off, a cross-check, and per-app screen-time stats. Not needed for v1 unless stats require it.
 
 ## 2. Block (the Shield) without flicker

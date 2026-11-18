@@ -10,3 +10,4 @@ Android has no system-level website blocking for ordinary apps. We block website
 
 - Only browsers Focal has been taught about are covered. Per-browser address-bar lookup lives in a small, data-like table so new or changed browsers don't touch the engine.
 - The accessibility service must be configured to retrieve window content (`canRetrieveWindowContent`), which widens what Play's accessibility declaration has to justify.
+- Navigation inside an open browser window (following a link, switching tabs) need not fire a window-state event, so the service also listens for content and text-change events in supported browsers and re-checks the address bar on each. These events are frequent, so they are scoped to browser packages and debounced (see `docs/android-blocking-engine.md`).
