@@ -26,3 +26,6 @@ data object Schedules
 /** A null id creates a new Schedule. */
 @Serializable
 data class ScheduleEditor(val id: String? = null)
+
+@Serializable
+data object Stats

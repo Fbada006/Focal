@@ -35,6 +35,7 @@ import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.ui.components.FocalTopBar
 import io.disruption.focal.ui.components.SectionTitle
 import io.disruption.focal.ui.home.description
+import io.disruption.focal.ui.home.formatMinutes
 import io.disruption.focal.ui.home.label
 import io.disruption.focal.ui.mvi.CollectEffects
 import kotlinx.datetime.LocalTime
@@ -182,14 +183,5 @@ private fun Stepper(value: String, onMinus: () -> Unit, onPlus: () -> Unit) {
         OutlinedButton(onClick = onMinus) { Text("−") }
         Text(value, style = MaterialTheme.typography.titleLarge)
         OutlinedButton(onClick = onPlus) { Text("+") }
-    }
-}
-
-internal fun formatMinutes(duration: Duration): String {
-    val minutes = duration.inWholeMinutes
-    return when {
-        minutes < 60 -> "$minutes min"
-        minutes % 60 == 0L -> "${minutes / 60} h"
-        else -> "${minutes / 60} h ${minutes % 60} min"
     }
 }

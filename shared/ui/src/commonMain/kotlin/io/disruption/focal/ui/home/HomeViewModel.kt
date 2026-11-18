@@ -40,6 +40,7 @@ sealed interface HomeIntent {
     data object StartClicked : HomeIntent
     data object BlockListsClicked : HomeIntent
     data object SchedulesClicked : HomeIntent
+    data object StatsClicked : HomeIntent
     data class EndClicked(val sessionId: String) : HomeIntent
     data class TakeBreakClicked(val sessionId: String) : HomeIntent
     data class EditClicked(val sessionId: String) : HomeIntent
@@ -49,6 +50,7 @@ sealed interface HomeEffect {
     data object OpenStart : HomeEffect
     data object OpenBlockLists : HomeEffect
     data object OpenSchedules : HomeEffect
+    data object OpenStats : HomeEffect
     data class OpenExitCountdown(val sessionId: String) : HomeEffect
     data class OpenEditSession(val sessionId: String) : HomeEffect
 }
@@ -71,6 +73,7 @@ class HomeViewModel(
             HomeIntent.StartClicked -> emit(HomeEffect.OpenStart)
             HomeIntent.BlockListsClicked -> emit(HomeEffect.OpenBlockLists)
             HomeIntent.SchedulesClicked -> emit(HomeEffect.OpenSchedules)
+            HomeIntent.StatsClicked -> emit(HomeEffect.OpenStats)
             is HomeIntent.EndClicked -> end(intent.sessionId)
             is HomeIntent.EditClicked -> emit(HomeEffect.OpenEditSession(intent.sessionId))
             is HomeIntent.TakeBreakClicked -> viewModelScope.launch {
