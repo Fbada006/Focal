@@ -31,11 +31,16 @@ kotlin {
         }
     }
 
+    compilerOptions {
+        optIn.add("kotlin.time.ExperimentalTime")
+    }
+
     sourceSets {
         commonMain.dependencies {
             api(project(":shared:core"))
             api(project(":shared:data"))
             api(project(":shared:ui"))
+            api(libs.koin.core)
         }
     }
 }
