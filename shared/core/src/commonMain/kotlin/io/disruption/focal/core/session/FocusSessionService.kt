@@ -14,6 +14,7 @@ import io.disruption.focal.core.repository.FocusSessionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -35,6 +36,9 @@ class FocusSessionService(
     lock: SessionLock = SessionLock(),
 ) {
     private val mutex = lock.mutex
+
+    /** Exit Countdowns in progress, by session. Held in memory: leaving the countdown cancels it. */
+    private val countdowns = mutableMapOf<FocusSessionId, ExitCountdown>()
 
     /** Running sessions, ordered by planned end. */
     val running: Flow<List<FocusSession>> = sessions.observeRunning()
@@ -82,6 +86,45 @@ class FocusSessionService(
             return EndResult.Ended(finish(session, Outcome.Completed, session.plannedEnd))
         }
         if (session.strictness != Strictness.Normal) return EndResult.NotAllowed(session.strictness)
+        EndResult.Ended(finish(session, Outcome.EndedEarly, now))
+    }
+
+    /**
+     * Start the Exit Countdown for ending a Delayed session early. The user must wait it out and
+     * then confirm with [confirmEndEarly]; leaving it cancels it ([cancelExitCountdown]).
+     */
+    suspend fun beginExitCountdown(id: FocusSessionId): CountdownResult = mutex.withLock {
+        val session = sessions.get(id)?.takeIf { it.isRunning } ?: return CountdownResult.NotRunning
+        if (session.strictness != Strictness.Delayed) return CountdownResult.NotAllowed(session.strictness)
+        val now = clock.now()
+        val countdown = ExitCountdown(id, startedAt = now, endsAt = now + EXIT_COUNTDOWN)
+        countdowns[id] = countdown
+        CountdownResult.Started(countdown)
+    }
+
+    /** Leaving the Exit Countdown, or backgrounding Focal, cancels it. */
+    suspend fun cancelExitCountdown(id: FocusSessionId) = mutex.withLock {
+        countdowns.remove(id)
+        Unit
+    }
+
+    /**
+     * End a Delayed session early once its Exit Countdown has finished, recorded as Ended Early.
+     * Without a finished countdown nothing changes and the session keeps running.
+     */
+    suspend fun confirmEndEarly(id: FocusSessionId): EndResult = mutex.withLock {
+        val session = sessions.get(id)?.takeIf { it.isRunning } ?: run {
+            countdowns.remove(id)
+            return EndResult.NotRunning
+        }
+        val now = clock.now()
+        if (now >= session.plannedEnd) {
+            countdowns.remove(id)
+            return EndResult.Ended(finish(session, Outcome.Completed, session.plannedEnd))
+        }
+        val countdown = countdowns[id] ?: return EndResult.CountdownRequired
+        if (now < countdown.endsAt) return EndResult.CountdownRequired
+        countdowns.remove(id)
         EndResult.Ended(finish(session, Outcome.EndedEarly, now))
     }
 
@@ -174,6 +217,9 @@ class FocusSessionService(
         return finished
     }
 }
+
+/** How long the user must wait before confirming that a Delayed session should end early. */
+val EXIT_COUNTDOWN = 30.seconds
 
 @OptIn(ExperimentalUuidApi::class)
 private fun randomId(): String = Uuid.random().toString()

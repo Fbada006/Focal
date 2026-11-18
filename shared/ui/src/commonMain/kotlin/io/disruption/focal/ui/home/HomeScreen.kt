@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.ui.components.EmptyMessage
 import io.disruption.focal.ui.components.FocalTopBar
 import io.disruption.focal.ui.components.SectionTitle
@@ -31,6 +32,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun HomeRoute(
     onOpenStart: () -> Unit,
     onOpenBlockLists: () -> Unit,
+    onOpenExitCountdown: (sessionId: String) -> Unit,
     sessionActions: @Composable (RunningSessionRow) -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
 ) {
@@ -39,6 +41,7 @@ fun HomeRoute(
         when (effect) {
             HomeEffect.OpenStart -> onOpenStart()
             HomeEffect.OpenBlockLists -> onOpenBlockLists()
+            is HomeEffect.OpenExitCountdown -> onOpenExitCountdown(effect.sessionId)
         }
     }
     HomeScreen(state, viewModel::onIntent, sessionActions)
@@ -99,7 +102,9 @@ private fun RunningSessionCard(row: RunningSessionRow, onEnd: () -> Unit, action
             )
             Text(row.timeLeft, style = MaterialTheme.typography.headlineSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (row.canEnd) OutlinedButton(onClick = onEnd) { Text("End session") }
+                if (row.canEnd) {
+                    OutlinedButton(onClick = onEnd) { Text(if (row.strictness == Strictness.Normal) "End session" else "End early") }
+                }
                 actions()
             }
         }
