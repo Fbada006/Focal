@@ -2,6 +2,7 @@ package io.disruption.focal
 
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.blocklist.BlockListService
+import io.disruption.focal.core.schedule.ScheduleService
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.core.session.SessionLock
 import io.disruption.focal.core.time.TimeZoneProvider
@@ -21,6 +22,7 @@ val coreModule: Module = module {
     single { SessionLock() }
     single { FocusSessionService(get(), get(), get(), get(), lock = get()) }
     single { BlockListService(get(), get(), get(), lock = get()) }
+    single { ScheduleService(get(), get(), get(), get()) }
 }
 
 /**

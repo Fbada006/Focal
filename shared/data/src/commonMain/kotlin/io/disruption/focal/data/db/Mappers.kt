@@ -7,8 +7,11 @@ import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
+import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalTime
 import kotlin.time.Instant
 
 internal fun BlockList.toEntity() = BlockListEntity(
@@ -53,4 +56,26 @@ internal fun FocusSessionEntity.toModel() = FocusSession(
     breaks = breaks.map { Break(Instant.fromEpochMilliseconds(it.startedAt), Instant.fromEpochMilliseconds(it.endsAt)) },
     endedAt = endedAt?.let(Instant::fromEpochMilliseconds),
     outcome = outcome?.let(Outcome::valueOf),
+)
+
+internal fun Schedule.toEntity() = ScheduleEntity(
+    id = id.value,
+    name = name,
+    days = days.map { it.name }.toSet(),
+    start = start.toString().take(5),
+    end = end.toString().take(5),
+    blockListId = blockListId.value,
+    strictness = strictness.name,
+    enabled = enabled,
+)
+
+internal fun ScheduleEntity.toModel() = Schedule(
+    id = ScheduleId(id),
+    name = name,
+    days = days.map(DayOfWeek::valueOf).toSet(),
+    start = LocalTime.parse(start),
+    end = LocalTime.parse(end),
+    blockListId = BlockListId(blockListId),
+    strictness = Strictness.valueOf(strictness),
+    enabled = enabled,
 )

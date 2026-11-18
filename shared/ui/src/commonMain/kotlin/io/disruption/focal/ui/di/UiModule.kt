@@ -5,6 +5,8 @@ import io.disruption.focal.ui.blocklists.BlockListsViewModel
 import io.disruption.focal.ui.countdown.ExitCountdownViewModel
 import io.disruption.focal.ui.edit.EditSessionViewModel
 import io.disruption.focal.ui.home.HomeViewModel
+import io.disruption.focal.ui.schedules.ScheduleEditorViewModel
+import io.disruption.focal.ui.schedules.SchedulesViewModel
 import io.disruption.focal.ui.start.StartSessionViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
@@ -18,4 +20,6 @@ val uiModule: Module = module {
     viewModel { (id: String) -> ExitCountdownViewModel(id, get(), get()) }
     viewModel { (id: String) -> EditSessionViewModel(id, get(), get(), get()) }
     viewModel { StartSessionViewModel(get(), get(), get(), get()) }
+    viewModel { SchedulesViewModel(get()) }
+    viewModel { (id: String) -> ScheduleEditorViewModel(id.ifEmpty { null }, get(), get()) }
 }

@@ -14,7 +14,7 @@ import kotlinx.coroutines.IO
  * future versions can ship migrations. Until v1 is released, the schema stays at version 1.
  */
 @Database(
-    entities = [BlockListEntity::class, FocusSessionEntity::class],
+    entities = [BlockListEntity::class, FocusSessionEntity::class, ScheduleEntity::class],
     version = 1,
     exportSchema = true,
 )
@@ -23,6 +23,7 @@ import kotlinx.coroutines.IO
 abstract class FocalDatabase : RoomDatabase() {
     abstract fun blockListDao(): BlockListDao
     abstract fun focusSessionDao(): FocusSessionDao
+    abstract fun scheduleDao(): ScheduleDao
 
     companion object {
         const val FILE_NAME = "focal.db"

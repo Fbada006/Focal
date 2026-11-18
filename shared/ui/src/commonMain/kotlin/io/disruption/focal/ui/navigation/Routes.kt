@@ -19,3 +19,10 @@ data class ExitCountdown(val sessionId: String)
 
 @Serializable
 data class EditSession(val sessionId: String)
+
+@Serializable
+data object Schedules
+
+/** A null id creates a new Schedule. */
+@Serializable
+data class ScheduleEditor(val id: String? = null)
