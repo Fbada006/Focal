@@ -179,3 +179,24 @@ class FocusSessionServiceTest {
         assertEquals(setOf(long.id), f.engine.applied.keys)
     }
 }
+
+class SessionLengthTest {
+    private val zone = kotlinx.datetime.TimeZone.of("Europe/Berlin")
+
+    @Test
+    fun untilNextPicksLaterTodayOrTomorrow() {
+        val now = kotlin.time.Instant.parse("2026-01-05T09:00:00Z") // 10:00 in Berlin
+        assertEquals(
+            kotlin.time.Instant.parse("2026-01-05T16:30:00Z"),
+            SessionLength.untilNext(kotlinx.datetime.LocalTime(17, 30), now, zone).end,
+        )
+        assertEquals(
+            kotlin.time.Instant.parse("2026-01-06T06:00:00Z"),
+            SessionLength.untilNext(kotlinx.datetime.LocalTime(7, 0), now, zone).end,
+        )
+        assertEquals(
+            kotlin.time.Instant.parse("2026-01-06T09:00:00Z"),
+            SessionLength.untilNext(kotlinx.datetime.LocalTime(10, 0), now, zone).end,
+        )
+    }
+}
