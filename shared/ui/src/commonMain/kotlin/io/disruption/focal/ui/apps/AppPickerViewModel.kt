@@ -7,6 +7,7 @@ import io.disruption.focal.core.blocklist.BlockListResult
 import io.disruption.focal.core.blocklist.BlockListService
 import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.ui.blocklists.deferredMessage
+import io.disruption.focal.core.website.SuggestedWebsitesCatalog
 import io.disruption.focal.ui.mvi.MviViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -30,11 +31,16 @@ sealed interface AppPickerIntent {
     data class Toggled(val packageName: String) : AppPickerIntent
 }
 
-/** The Android Apps tab: search the installed apps and pick which to block (story 16). */
+/**
+ * The Android Apps tab: search the installed apps and pick which to block (story 16). Picking an
+ * app also selects the matching Suggested Websites, so blocking Instagram the app blocks
+ * instagram.com by default (story 22); they can be unticked in the Websites tab.
+ */
 class AppPickerViewModel(
     blockListId: String,
     private val blockLists: BlockListService,
     private val installedApps: InstalledAppsSource,
+    private val suggested: SuggestedWebsitesCatalog,
 ) : MviViewModel<AppPickerState, AppPickerIntent, Nothing>(AppPickerState()) {
     private val id = BlockListId(blockListId)
     private val installed = MutableStateFlow<List<InstalledApp>?>(null)
@@ -61,8 +67,13 @@ class AppPickerViewModel(
         when (intent) {
             is AppPickerIntent.QueryChanged -> query.value = intent.query
             is AppPickerIntent.Toggled -> viewModelScope.launch {
-                val saved = blockLists.toggleApp(id, intent.packageName) as? BlockListResult.Saved ?: return@launch
+                val pkg = intent.packageName
+                val saved = blockLists.toggleApp(id, pkg) as? BlockListResult.Saved ?: return@launch
                 showDeferred(saved.removalsDeferredFor)
+                if (pkg in saved.blockList.blocked.apps) {
+                    val domains = suggested.forAndroidApps(listOf(pkg)).flatMap { it.domains }.toSet()
+                    if (domains.isNotEmpty()) blockLists.addDomains(id, domains)
+                }
             }
         }
     }

@@ -6,10 +6,14 @@ import io.disruption.focal.core.blocklist.BlockListService
 import io.disruption.focal.core.blocklist.DeleteResult
 import io.disruption.focal.core.blocklist.DomainEditResult
 import io.disruption.focal.core.model.BlockListId
+import io.disruption.focal.core.website.SuggestedWebsitesCatalog
 import io.disruption.focal.ui.mvi.MviViewModel
 import kotlinx.coroutines.launch
 
 enum class EditorTab { Apps, Websites }
+
+/** A Suggested Website service; selected when all its domains are on the Block List. */
+data class SuggestionRow(val id: String, val name: String, val domains: String, val selected: Boolean)
 
 data class BlockListEditorState(
     val loading: Boolean = true,
@@ -19,6 +23,7 @@ data class BlockListEditorState(
     val apps: Set<String> = emptySet(),
     val appCategories: Set<String> = emptySet(),
     val domains: List<String> = emptyList(),
+    val suggestions: List<SuggestionRow> = emptyList(),
     val domainInput: String = "",
     val domainError: String? = null,
     /** The domain being edited in the input field, or null when adding a new one. */
@@ -40,6 +45,7 @@ sealed interface BlockListEditorIntent {
     data class EditDomain(val domain: String) : BlockListEditorIntent
     data object CancelDomainEdit : BlockListEditorIntent
     data class RemoveDomain(val domain: String) : BlockListEditorIntent
+    data class SuggestionToggled(val serviceId: String) : BlockListEditorIntent
     data object DeleteClicked : BlockListEditorIntent
     data object DeleteConfirmed : BlockListEditorIntent
     data object DeleteDismissed : BlockListEditorIntent
@@ -54,6 +60,7 @@ sealed interface BlockListEditorEffect {
 class BlockListEditorViewModel(
     blockListId: String,
     private val service: BlockListService,
+    private val suggested: SuggestedWebsitesCatalog,
 ) : MviViewModel<BlockListEditorState, BlockListEditorIntent, BlockListEditorEffect>(BlockListEditorState()) {
     private val id = BlockListId(blockListId)
     private var deleted = false
@@ -73,6 +80,14 @@ class BlockListEditorViewModel(
                         apps = list.blocked.apps,
                         appCategories = list.blocked.appCategories,
                         domains = list.blocked.domains.sorted(),
+                        suggestions = suggested.services.map { suggestion ->
+                            SuggestionRow(
+                                id = suggestion.id,
+                                name = suggestion.name,
+                                domains = suggestion.domains.sorted().joinToString(", "),
+                                selected = list.blocked.domains.containsAll(suggestion.domains),
+                            )
+                        },
                     )
                 }
             }
@@ -97,11 +112,25 @@ class BlockListEditorViewModel(
                     setState { copy(editingDomain = null, domainInput = "") }
                 }
             }
+            is BlockListEditorIntent.SuggestionToggled -> toggleSuggestion(intent.serviceId)
             BlockListEditorIntent.DeleteClicked -> setState { copy(confirmingDelete = true) }
             BlockListEditorIntent.DeleteDismissed -> setState { copy(confirmingDelete = false) }
             BlockListEditorIntent.DeleteConfirmed -> delete()
             BlockListEditorIntent.DeleteRefusalDismissed -> setState { copy(deleteRefusal = null) }
             BlockListEditorIntent.NoticeDismissed -> setState { copy(notice = null) }
+        }
+    }
+
+    private fun toggleSuggestion(serviceId: String) {
+        val suggestion = suggested.services.firstOrNull { it.id == serviceId } ?: return
+        val selected = currentState.suggestions.firstOrNull { it.id == serviceId }?.selected ?: return
+        viewModelScope.launch {
+            val result = if (selected) {
+                service.removeDomains(id, suggestion.domains)
+            } else {
+                service.addDomains(id, suggestion.domains)
+            }
+            if (result is BlockListResult.Saved) showDeferred(result.removalsDeferredFor)
         }
     }
 

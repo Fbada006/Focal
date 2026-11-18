@@ -9,6 +9,7 @@ import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.testing.FakeClock
+import io.disruption.focal.testing.FakeSuggestedWebsites
 import io.disruption.focal.testing.InMemoryBlockListRepository
 import io.disruption.focal.testing.RecordingBlockingEngine
 import io.disruption.focal.testing.InMemoryFocusSessionRepository
@@ -61,7 +62,7 @@ class BlockListViewModelsTest : MainDispatcherTest() {
 
     @Test
     fun typedDomainsAreAddedInTheirNormalisedForm() = runTest {
-        val vm = BlockListEditorViewModel("social", service)
+        val vm = BlockListEditorViewModel("social", service, FakeSuggestedWebsites)
         vm.onIntent(BlockListEditorIntent.DomainInputChanged("https://www.Reddit.com/r/all"))
         vm.onIntent(BlockListEditorIntent.DomainSubmitted)
 
@@ -72,7 +73,7 @@ class BlockListViewModelsTest : MainDispatcherTest() {
 
     @Test
     fun invalidDomainInputShowsAnErrorAndKeepsTheText() = runTest {
-        val vm = BlockListEditorViewModel("social", service)
+        val vm = BlockListEditorViewModel("social", service, FakeSuggestedWebsites)
         vm.onIntent(BlockListEditorIntent.DomainInputChanged("reddit"))
         vm.onIntent(BlockListEditorIntent.DomainSubmitted)
 
@@ -83,7 +84,7 @@ class BlockListViewModelsTest : MainDispatcherTest() {
 
     @Test
     fun domainsCanBeEditedAndRemoved() = runTest {
-        val vm = BlockListEditorViewModel("social", service)
+        val vm = BlockListEditorViewModel("social", service, FakeSuggestedWebsites)
         vm.onIntent(BlockListEditorIntent.EditDomain("x.com"))
         vm.onIntent(BlockListEditorIntent.DomainInputChanged("m.x.com"))
         vm.onIntent(BlockListEditorIntent.DomainSubmitted)
@@ -99,7 +100,7 @@ class BlockListViewModelsTest : MainDispatcherTest() {
         sessions.save(
             FocusSession(FocusSessionId("s"), social.id, "Social", Strictness.Locked, start, start + 1.hours, social.blocked),
         )
-        val vm = BlockListEditorViewModel("social", service)
+        val vm = BlockListEditorViewModel("social", service, FakeSuggestedWebsites)
         vm.onIntent(BlockListEditorIntent.DeleteClicked)
         vm.onIntent(BlockListEditorIntent.DeleteConfirmed)
 
@@ -111,7 +112,7 @@ class BlockListViewModelsTest : MainDispatcherTest() {
 
     @Test
     fun deletingAnUnusedListClosesTheEditor() = runTest {
-        val vm = BlockListEditorViewModel("social", service)
+        val vm = BlockListEditorViewModel("social", service, FakeSuggestedWebsites)
         vm.onIntent(BlockListEditorIntent.DeleteClicked)
         vm.onIntent(BlockListEditorIntent.DeleteConfirmed)
 
@@ -121,7 +122,7 @@ class BlockListViewModelsTest : MainDispatcherTest() {
 
     @Test
     fun renamingTrimsAndRefusesBlankNames() = runTest {
-        val vm = BlockListEditorViewModel("social", service)
+        val vm = BlockListEditorViewModel("social", service, FakeSuggestedWebsites)
         vm.onIntent(BlockListEditorIntent.NameChanged("  "))
         vm.onIntent(BlockListEditorIntent.NameCommitted)
         assertNotNull(vm.state.value.nameError)
@@ -130,5 +131,22 @@ class BlockListViewModelsTest : MainDispatcherTest() {
         vm.onIntent(BlockListEditorIntent.NameCommitted)
         assertEquals("Feeds", blockLists.get(social.id)?.name)
         assertEquals("Feeds", vm.state.value.name)
+    }
+}
+
+class SuggestedWebsitesTest : MainDispatcherTest() {
+    private val f = io.disruption.focal.ui.SessionUiFixture()
+
+    @Test
+    fun aSuggestionIsSelectedWhenAllItsDomainsAreBlockedAndTogglesThem() = runTest {
+        val vm = BlockListEditorViewModel("social", f.blockLists, FakeSuggestedWebsites)
+        assertEquals(listOf(false, false), vm.state.value.suggestions.map { it.selected })
+
+        vm.onIntent(BlockListEditorIntent.SuggestionToggled("youtube"))
+        assertEquals(listOf("youtu.be", "youtube.com"), vm.state.value.domains)
+        assertEquals(true, vm.state.value.suggestions.single { it.id == "youtube" }.selected)
+
+        vm.onIntent(BlockListEditorIntent.SuggestionToggled("youtube"))
+        assertEquals(emptyList(), vm.state.value.domains)
     }
 }

@@ -2,6 +2,8 @@ package io.disruption.focal.data.di
 
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
+import io.disruption.focal.core.website.SuggestedWebsitesCatalog
+import io.disruption.focal.data.curated.CuratedSuggestedWebsites
 import io.disruption.focal.data.db.FocalDatabase
 import io.disruption.focal.data.preferences.DataStoreFocalPreferences
 import io.disruption.focal.data.preferences.FocalPreferences
@@ -20,4 +22,5 @@ val dataModule: Module = module {
     single<BlockListRepository> { RoomBlockListRepository(get()) }
     single<FocusSessionRepository> { RoomFocusSessionRepository(get()) }
     single<FocalPreferences> { DataStoreFocalPreferences(get()) }
+    single<SuggestedWebsitesCatalog> { CuratedSuggestedWebsites }
 }

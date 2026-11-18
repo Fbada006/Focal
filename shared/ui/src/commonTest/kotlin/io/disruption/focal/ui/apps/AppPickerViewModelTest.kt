@@ -7,6 +7,7 @@ import io.disruption.focal.ui.SessionUiFixture
 import io.disruption.focal.ui.social
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.core.session.SessionLength
+import io.disruption.focal.testing.FakeSuggestedWebsites
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,7 +24,7 @@ class AppPickerViewModelTest : MainDispatcherTest() {
         )
     }
 
-    private fun vm() = AppPickerViewModel(social.id.value, f.blockLists, installed)
+    private fun vm() = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites)
 
     @Test
     fun listsInstalledAppsWithSelectedOnesFirst() = runTest {
@@ -57,5 +58,30 @@ class AppPickerViewModelTest : MainDispatcherTest() {
         vm.onIntent(AppPickerIntent.Toggled("com.instagram.android"))
 
         assertNotNull(vm.state.value.notice)
+    }
+}
+
+class AppPickerSuggestionsTest : MainDispatcherTest() {
+    private val f = SessionUiFixture()
+    private val installed = InstalledAppsSource {
+        listOf(InstalledApp("com.google.android.youtube", "YouTube"), InstalledApp("com.android.chrome", "Chrome"))
+    }
+
+    @Test
+    fun pickingAnAppPreselectsItsSuggestedWebsites() = runTest {
+        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites)
+        vm.onIntent(AppPickerIntent.Toggled("com.google.android.youtube"))
+        vm.onIntent(AppPickerIntent.Toggled("com.android.chrome"))
+
+        assertEquals(setOf("youtube.com", "youtu.be"), f.blockListRepository.get(social.id)!!.blocked.domains)
+    }
+
+    @Test
+    fun unpickingAnAppKeepsItsWebsites() = runTest {
+        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites)
+        vm.onIntent(AppPickerIntent.Toggled("com.google.android.youtube"))
+        vm.onIntent(AppPickerIntent.Toggled("com.google.android.youtube"))
+
+        assertEquals(setOf("youtube.com", "youtu.be"), f.blockListRepository.get(social.id)!!.blocked.domains)
     }
 }

@@ -8,6 +8,7 @@ import io.disruption.focal.ui.SessionUiFixture
 import io.disruption.focal.ui.blocklists.BlockListEditorIntent
 import io.disruption.focal.ui.blocklists.BlockListEditorViewModel
 import io.disruption.focal.ui.social
+import io.disruption.focal.testing.FakeSuggestedWebsites
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -63,7 +64,7 @@ class EditSessionViewModelTest : MainDispatcherTest() {
     fun theBlockListEditorExplainsDeferredRemovals() = runTest {
         f.blockLists.addDomain(social.id, "youtube.com")
         start(Strictness.Locked)
-        val vm = BlockListEditorViewModel(social.id.value, f.blockLists)
+        val vm = BlockListEditorViewModel(social.id.value, f.blockLists, FakeSuggestedWebsites)
 
         vm.onIntent(BlockListEditorIntent.RemoveDomain("youtube.com"))
 
