@@ -38,6 +38,7 @@ fun HomeRoute(
     onOpenEditSession: (sessionId: String) -> Unit,
     onOpenSchedules: () -> Unit,
     onOpenStats: () -> Unit,
+    onOpenHelp: () -> Unit,
     sessionActions: @Composable (RunningSessionRow) -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
 ) {
@@ -48,6 +49,7 @@ fun HomeRoute(
             HomeEffect.OpenBlockLists -> onOpenBlockLists()
             HomeEffect.OpenSchedules -> onOpenSchedules()
             HomeEffect.OpenStats -> onOpenStats()
+            HomeEffect.OpenHelp -> onOpenHelp()
             is HomeEffect.OpenExitCountdown -> onOpenExitCountdown(effect.sessionId)
             is HomeEffect.OpenEditSession -> onOpenEditSession(effect.sessionId)
         }
@@ -98,7 +100,7 @@ fun HomeScreen(
             }
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(horizontal = 16.dp).weight(1f),
             ) {
                 items(state.running, key = { it.id }) { row ->
                     RunningSessionCard(
@@ -109,6 +111,10 @@ fun HomeScreen(
                     ) { sessionActions(row) }
                 }
             }
+            TextButton(
+                onClick = { onIntent(HomeIntent.HelpClicked) },
+                modifier = Modifier.padding(8.dp),
+            ) { Text("Why did my session stop?") }
         }
     }
 }

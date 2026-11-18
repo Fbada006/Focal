@@ -5,6 +5,7 @@ import io.disruption.focal.testing.FakePermissionGateway
 import io.disruption.focal.testing.FakeSuggestedWebsites
 import io.disruption.focal.ui.MainDispatcherTest
 import io.disruption.focal.ui.SessionUiFixture
+import io.disruption.focal.ui.help.FakeDeviceHelp
 import io.disruption.focal.ui.home.HomeEffect
 import io.disruption.focal.ui.home.HomeIntent
 import io.disruption.focal.ui.home.HomeViewModel
@@ -31,7 +32,7 @@ class OnboardingAndGatingTest : MainDispatcherTest() {
 
     @Test
     fun onboardingExplainsThenAsksForEachPermissionAndCreatesTheFirstBlockList() = runTest {
-        val vm = OnboardingViewModel(permissions, f.blockLists, f.preferences, FakeSuggestedWebsites)
+        val vm = OnboardingViewModel(permissions, f.blockLists, f.preferences, FakeSuggestedWebsites, FakeDeviceHelp(oem = null))
         assertEquals(OnboardingStep.Intro, vm.state.value.step)
         assertTrue(permissions.requested.isEmpty(), "nothing is asked before the intro")
 

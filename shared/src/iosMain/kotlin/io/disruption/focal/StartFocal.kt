@@ -4,6 +4,7 @@ import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.ios.ingestOnLaunch
 import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.session.FocusSessionService
+import io.disruption.focal.ui.di.iosUiModule
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -30,7 +31,7 @@ fun startFocal(
     blockingEngine: BlockingEngine = PendingBlockingEngine(),
     permissionGateway: PermissionGateway = PendingPermissionGateway(),
 ) {
-    val koin = initKoin(blockingEngine, permissionGateway).koin
+    val koin = initKoin(blockingEngine, permissionGateway, platformModules = listOf(iosUiModule)).koin
     MainScope().launch { ingestOnLaunch(koin.get<FocusSessionService>(), readExtensionEvents()) }
 }
 

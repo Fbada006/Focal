@@ -7,12 +7,19 @@ import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.repository.AppPreferences
 import io.disruption.focal.core.website.SuggestedWebsitesCatalog
+import io.disruption.focal.ui.help.BatteryGuidance
+import io.disruption.focal.ui.help.BatteryHelpState
+import io.disruption.focal.ui.help.DeviceHelp
+import io.disruption.focal.ui.help.HelpLink
 import io.disruption.focal.ui.mvi.MviViewModel
 import kotlinx.coroutines.launch
 
 sealed interface OnboardingStep {
     data object Intro : OnboardingStep
     data class Grant(val permission: Permission, val granted: Boolean) : OnboardingStep
+
+    /** Battery and autostart steps, on phones whose maker stops background apps (story 7). */
+    data object BatteryHelp : OnboardingStep
     data object FirstBlockList : OnboardingStep
 }
 
@@ -25,6 +32,7 @@ data class OnboardingState(
     val error: String? = null,
     /** The first Block List is being created; Create is disabled so a double tap makes one list. */
     val creating: Boolean = false,
+    val batteryHelp: BatteryHelpState = BatteryHelpState(null, emptyList()),
 )
 
 sealed interface OnboardingIntent {
@@ -35,6 +43,7 @@ sealed interface OnboardingIntent {
     data object Resumed : OnboardingIntent
     data class BlockListNameChanged(val name: String) : OnboardingIntent
     data class SuggestionToggled(val id: String) : OnboardingIntent
+    data class HelpLinkClicked(val link: HelpLink) : OnboardingIntent
     data object CreateBlockListClicked : OnboardingIntent
 }
 
@@ -56,8 +65,12 @@ class OnboardingViewModel(
     private val blockLists: BlockListService,
     private val preferences: AppPreferences,
     private val suggested: SuggestedWebsitesCatalog,
+    private val device: DeviceHelp,
 ) : MviViewModel<OnboardingState, OnboardingIntent, OnboardingEffect>(
-    OnboardingState(suggestions = suggested.services.map { SuggestionChoice(it.id, it.name, it.id in DEFAULT_PICKS) }),
+    OnboardingState(
+        suggestions = suggested.services.map { SuggestionChoice(it.id, it.name, it.id in DEFAULT_PICKS) },
+        batteryHelp = BatteryHelpState(device.oem?.label, BatteryGuidance.steps(device.oem)),
+    ),
 ) {
     private val steps: List<Permission> = permissions.requiredForSessions
 
@@ -71,6 +84,7 @@ class OnboardingViewModel(
                 copy(suggestions = suggestions.map { if (it.id == intent.id) it.copy(selected = !it.selected) else it })
             }
             OnboardingIntent.CreateBlockListClicked -> createBlockList()
+            is OnboardingIntent.HelpLinkClicked -> device.open(intent.link)
         }
     }
 
@@ -78,11 +92,15 @@ class OnboardingViewModel(
         val nextPermission = when (val step = currentState.step) {
             OnboardingStep.Intro -> steps.firstOrNull()
             is OnboardingStep.Grant -> steps.getOrNull(steps.indexOf(step.permission) + 1)
+            OnboardingStep.BatteryHelp -> {
+                setState { copy(step = OnboardingStep.FirstBlockList) }
+                return
+            }
             OnboardingStep.FirstBlockList -> return
         }
         viewModelScope.launch {
             val step = nextPermission?.let { OnboardingStep.Grant(it, permissions.isGranted(it)) }
-                ?: OnboardingStep.FirstBlockList
+                ?: if (BatteryGuidance.needsOnboardingStep(device.oem)) OnboardingStep.BatteryHelp else OnboardingStep.FirstBlockList
             setState { copy(step = step) }
         }
     }

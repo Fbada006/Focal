@@ -32,3 +32,6 @@ data object Stats
 
 @Serializable
 data object Onboarding
+
+@Serializable
+data object BatteryHelp
