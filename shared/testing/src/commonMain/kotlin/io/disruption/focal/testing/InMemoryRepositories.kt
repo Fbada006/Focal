@@ -4,8 +4,11 @@ import io.disruption.focal.core.model.BlockList
 import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
+import io.disruption.focal.core.model.Schedule
+import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
+import io.disruption.focal.core.repository.ScheduleRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -33,4 +36,14 @@ class InMemoryFocusSessionRepository(vararg initial: FocusSession) : FocusSessio
     override suspend fun save(session: FocusSession) = sessions.update { it + (session.id to session) }
 
     private fun running(all: Collection<FocusSession>) = all.filter { it.isRunning }.sortedBy { it.plannedEnd }
+}
+
+class InMemoryScheduleRepository(vararg initial: Schedule) : ScheduleRepository {
+    private val schedules = MutableStateFlow(initial.associateBy { it.id })
+
+    override fun observeAll(): Flow<List<Schedule>> = schedules.map { it.values.sortedBy { s -> s.name } }
+    override suspend fun getAll(): List<Schedule> = schedules.value.values.sortedBy { it.name }
+    override suspend fun get(id: ScheduleId): Schedule? = schedules.value[id]
+    override suspend fun save(schedule: Schedule) = schedules.update { it + (schedule.id to schedule) }
+    override suspend fun delete(id: ScheduleId) = schedules.update { it - id }
 }

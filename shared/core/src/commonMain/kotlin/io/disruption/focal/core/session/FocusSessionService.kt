@@ -1,6 +1,8 @@
 package io.disruption.focal.core.session
 
 import io.disruption.focal.core.blocking.BlockingEngine
+import io.disruption.focal.core.ios.ExtensionEvent
+import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
@@ -99,6 +101,47 @@ class FocusSessionService(
         val running = sessions.getRunning()
         running.forEach { engine.apply(it) }
         running
+    }
+
+    /**
+     * Apply what the iOS extensions recorded while Focal wasn't running (ADR 0008): sessions they
+     * started for Schedules and sessions whose window they ended. Ingesting the same events again
+     * changes nothing. Call [restore] afterwards to bring blocking and outcomes up to date.
+     */
+    suspend fun ingest(events: List<ExtensionEvent>): IngestReport = mutex.withLock {
+        var started = 0
+        var ended = 0
+        for (event in events.sortedBy { it.at }) {
+            when (event) {
+                is ExtensionEvent.ScheduleSessionStarted -> {
+                    val id = FocusSessionId(event.sessionId)
+                    if (sessions.get(id) != null) continue
+                    val blockList = blockLists.get(BlockListId(event.blockListId))
+                    sessions.save(
+                        FocusSession(
+                            id = id,
+                            blockListId = BlockListId(event.blockListId),
+                            name = event.name,
+                            strictness = Strictness.entries.firstOrNull { it.name == event.strictness } ?: Strictness.Normal,
+                            startedAt = event.at,
+                            plannedEnd = event.plannedEnd,
+                            blocked = blockList?.blocked ?: BlockedSet.Empty,
+                            scheduleId = ScheduleId(event.scheduleId),
+                        ),
+                    )
+                    started++
+                }
+                is ExtensionEvent.ScheduleSessionEnded -> {
+                    val session = sessions.get(FocusSessionId(event.sessionId))?.takeIf { it.isRunning } ?: continue
+                    if (event.at < session.plannedEnd) continue // only the window's end completes a session
+                    finish(session, Outcome.Completed, session.plannedEnd)
+                    ended++
+                }
+                // Breaks don't change the outcome or the end time; the app already recorded it.
+                is ExtensionEvent.BreakEnded -> Unit
+            }
+        }
+        IngestReport(sessionsStarted = started, sessionsCompleted = ended)
     }
 
     private suspend fun completeDueLocked(): List<FocusSession> {

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "type": "scheduleSessionStarted",
+      "id": "ev-1",
+      "at": "2026-01-05T09:00:00Z",
+      "sessionId": "fs-2",
+      "scheduleId": "sch-work",
+      "name": "Work hours",
+      "blockListId": "bl-social",
+      "strictness": "Delayed",
+      "plannedEnd": "2026-01-05T17:30:00Z"
+    },
+    {
+      "type": "breakEnded",
+      "id": "ev-2",
+      "at": "2026-01-05T10:00:00Z",
+      "sessionId": "fs-2"
+    },
+    {
+      "type": "scheduleSessionEnded",
+      "id": "ev-3",
+      "at": "2026-01-05T17:30:00Z",
+      "sessionId": "fs-2"
+    }
+  ]
+}

@@ -17,3 +17,5 @@ sealed interface EndResult {
     /** The session's Strictness does not allow ending it this way. */
     data class NotAllowed(val strictness: Strictness) : EndResult
 }
+
+data class IngestReport(val sessionsStarted: Int, val sessionsCompleted: Int)
