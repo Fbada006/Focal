@@ -18,13 +18,15 @@ Focal is an Opal-style focus app for Android and iOS: it blocks distracting apps
 - `androidApp`: Android app and Android blocking engine.
 - `iosApp`: iOS app, SwiftUI pieces and Swift-only Screen Time extensions.
 
-See ADR 0010. Until the split lands, the template's single `shared` module is still in place.
+See ADR 0010. `core` has a plain `jvm()` target rather than an Android one, so Android and iOS APIs are not on its classpath; Android modules consume its JVM variant.
 
 ## Commands
 
 - Android build: `./gradlew :androidApp:assembleDebug`
-- Shared tests (Android host): `./gradlew :shared:testAndroidHostTest`
-- Shared tests (iOS simulator): `./gradlew :shared:iosSimulatorArm64Test`
+- Domain tests (JVM): `./gradlew :shared:core:jvmTest`
+- Data and UI tests (Android host): `./gradlew :shared:data:testAndroidHostTest :shared:ui:testAndroidHostTest`
+- Shared tests (iOS simulator): `./gradlew :shared:core:iosSimulatorArm64Test :shared:data:iosSimulatorArm64Test :shared:ui:iosSimulatorArm64Test`
+- iOS framework: `./gradlew :shared:linkDebugFrameworkIosSimulatorArm64` (exports `core`, `data` and `ui` as `Shared`)
 - iOS app: open `iosApp/` in Xcode. Screen Time blocking needs a physical device.
 
 ## Agent skills
