@@ -26,7 +26,7 @@ class SessionUiFixture(vararg lists: BlockList = arrayOf(social, empty)) {
     val engine = RecordingBlockingEngine()
     private var ids = 0
     val sessions = FocusSessionService(blockListRepository, sessionRepository, engine, clock, newId = { "s${++ids}" })
-    val blockLists = BlockListService(blockListRepository, sessionRepository, sessions)
     val scheduleRepository = InMemoryScheduleRepository()
+    val blockLists = BlockListService(blockListRepository, sessionRepository, sessions, schedules = scheduleRepository)
     val schedules = ScheduleService(scheduleRepository, blockListRepository, sessions, zone, newId = { "sch" })
 }

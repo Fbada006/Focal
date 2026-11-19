@@ -24,4 +24,5 @@ internal fun ScheduleProblem.message(): String = when (this) {
     ScheduleProblem.NoDays -> "Pick at least one day."
     ScheduleProblem.SameStartAndEnd -> "The start and end can't be the same time."
     ScheduleProblem.NoBlockList -> "Pick a Block List."
+    ScheduleProblem.EmptyBlockList -> "That Block List is empty. Add apps or websites to it first."
 }

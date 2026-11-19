@@ -25,6 +25,12 @@ internal fun inUseMessage(sessionNames: List<String>): String =
     "This Block List can't be deleted while ${sessionNames.joinToString(", ")} " +
         "${if (sessionNames.size == 1) "is" else "are"} running. Delete it after the session ends."
 
+internal fun usedBySchedulesMessage(scheduleNames: List<String>): String =
+    "This Block List can't be deleted while the ${if (scheduleNames.size == 1) "Schedule" else "Schedules"} " +
+        "${scheduleNames.joinToString(", ")} ${if (scheduleNames.size == 1) "uses" else "use"} it. " +
+        "Pick another Block List for ${if (scheduleNames.size == 1) "it" else "them"} or delete " +
+        "${if (scheduleNames.size == 1) "it" else "them"} first."
+
 internal fun deferredMessage(sessionNames: List<String>): String {
     val names = sessionNames.distinct()
     return "Removals take effect after ${names.joinToString(" and ")} " +

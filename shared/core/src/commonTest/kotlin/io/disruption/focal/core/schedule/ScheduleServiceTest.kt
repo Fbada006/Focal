@@ -79,4 +79,38 @@ class ScheduleServiceTest {
         assertEquals(Strictness.Locked, session.strictness)
         assertEquals(Instant.parse("2026-01-06T12:00:00Z"), session.plannedEnd)
     }
+
+    @Test
+    fun aScheduleOnAnEmptyBlockListIsRefused() = runTest {
+        val empty = io.disruption.focal.core.model.BlockList(
+            io.disruption.focal.core.model.BlockListId("empty"), "Empty", io.disruption.focal.core.model.BlockedSet.Empty,
+        )
+        f.blockLists.save(empty)
+
+        assertEquals(
+            ScheduleSaveResult.Invalid(setOf(ScheduleProblem.EmptyBlockList)),
+            service.create(draft.copy(blockListId = empty.id)),
+        )
+    }
+
+    @Test
+    fun movingTheStartOfARunningSchedulesWindowDoesNotStartASecondSession() = runTest {
+        val saved = assertIs<ScheduleSaveResult.Saved>(service.create(draft.copy(days = setOf(MONDAY)))).schedule
+        f.clock.now = f.clock.now + 1.hours
+
+        service.update(saved.id, draft.copy(days = setOf(MONDAY), start = LocalTime(10, 30)))
+
+        assertEquals(1, f.sessions.getRunning().size)
+    }
+
+    @Test
+    fun aBlockListUsedByAScheduleCannotBeDeleted() = runTest {
+        service.create(draft)
+        val lists = io.disruption.focal.core.blocklist.BlockListService(f.blockLists, f.sessions, f.service, schedules = repo)
+
+        assertEquals(
+            io.disruption.focal.core.blocklist.DeleteResult.UsedBySchedules(listOf("Work hours")),
+            lists.delete(socialList.id),
+        )
+    }
 }

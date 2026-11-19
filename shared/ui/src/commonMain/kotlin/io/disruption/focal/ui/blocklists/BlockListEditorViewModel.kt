@@ -178,6 +178,7 @@ class BlockListEditorViewModel(
                     emit(BlockListEditorEffect.Closed)
                 }
                 is DeleteResult.InUse -> setState { copy(deleteRefusal = inUseMessage(result.sessionNames)) }
+                is DeleteResult.UsedBySchedules -> setState { copy(deleteRefusal = usedBySchedulesMessage(result.scheduleNames)) }
             }
         }
     }

@@ -30,7 +30,15 @@ sealed interface ScheduleSaveResult {
     data object NotFound : ScheduleSaveResult
 }
 
-enum class ScheduleProblem { NoName, NoDays, SameStartAndEnd, NoBlockList }
+enum class ScheduleProblem {
+    NoName,
+    NoDays,
+    SameStartAndEnd,
+    NoBlockList,
+
+    /** A Schedule on an empty Block List would never block anything, so it would never start. */
+    EmptyBlockList,
+}
 
 /**
  * Create, edit, switch and delete Schedules (stories 51, 53, 54). A running session is never
@@ -76,7 +84,9 @@ class ScheduleService(
             if (name.isEmpty()) add(ScheduleProblem.NoName)
             if (draft.days.isEmpty()) add(ScheduleProblem.NoDays)
             if (draft.start == draft.end) add(ScheduleProblem.SameStartAndEnd)
-            if (draft.blockListId == null || blockLists.get(draft.blockListId) == null) add(ScheduleProblem.NoBlockList)
+            val blockList = draft.blockListId?.let { blockLists.get(it) }
+            if (blockList == null) add(ScheduleProblem.NoBlockList)
+            else if (blockList.blocked.isEmpty) add(ScheduleProblem.EmptyBlockList)
         }
         if (problems.isNotEmpty()) return ScheduleSaveResult.Invalid(problems)
 
