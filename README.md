@@ -21,7 +21,8 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 - Domain tests: `./gradlew :shared:core:jvmTest`
-- Android host tests: `./gradlew :shared:data:testAndroidHostTest :shared:ui:testAndroidHostTest`
+- Android host tests: `./gradlew :shared:ui:testAndroidHostTest`
+- Repository tests (device or emulator): `./gradlew :shared:data:connectedAndroidDeviceTest`
 - iOS tests: `./gradlew :shared:core:iosSimulatorArm64Test :shared:data:iosSimulatorArm64Test :shared:ui:iosSimulatorArm64Test`
 
 ---
