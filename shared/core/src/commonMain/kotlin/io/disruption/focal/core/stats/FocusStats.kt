@@ -26,7 +26,7 @@ data class FocusStats(
 )
 
 object StatsCalculator {
-    /** A day counts toward the Streak only with a Completed session at least this long. */
+    /** A day counts toward the Streak only with a Completed session blocking at least this long. */
     val STREAK_MINIMUM: Duration = 15.minutes
 
     /**
@@ -34,7 +34,8 @@ object StatsCalculator {
      * split across the local days it covers. Weeks start on [weekStart].
      *
      * The Streak is the number of consecutive local days each with a Completed session of at
-     * least [STREAK_MINIMUM]. A session counts for the day it ends. Ended Early sessions neither
+     * least [STREAK_MINIMUM] of blocking, Breaks not counted (the same clock as focus time). A
+     * session counts for the day it ends. Ended Early sessions neither
      * count nor reset it; a Broken session resets it to zero at once, so only days completed after
      * it count. Schedule-started sessions count like manual ones.
      */
@@ -77,7 +78,7 @@ object StatsCalculator {
                     lastDay = null
                 }
                 Outcome.Completed -> {
-                    if (endedAt - session.startedAt < STREAK_MINIMUM) continue
+                    if (session.blockingTime(endedAt) < STREAK_MINIMUM) continue
                     val day = endedAt.toLocalDateTime(zone).date
                     length = when (lastDay) {
                         day -> length
@@ -93,6 +94,10 @@ object StatsCalculator {
         val alive = lastDay == today || lastDay == today.minus(DatePeriod(days = 1))
         return (if (alive) length else 0) to longest
     }
+
+    /** Time spent blocking from start to [end], less Breaks. */
+    private fun FocusSession.blockingTime(end: Instant): Duration =
+        focusWithin(startedAt..end, end)
 
     private fun FocusSession.focusWithin(range: ClosedRange<Instant>, now: Instant): Duration {
         val end = endedAt ?: minOf(now, plannedEnd)

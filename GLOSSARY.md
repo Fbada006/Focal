@@ -71,5 +71,5 @@ The outcome of a Locked Focus Session whose blocking was defeated from outside F
 _Avoid_: Failed, cancelled
 
 **Streak**:
-The number of consecutive local calendar days, each with at least one Completed Focus Session of 15 minutes or more. A session counts for the day it ends. Ended Early sessions neither count nor reset it; a Broken session resets it to zero immediately.
+The number of consecutive local calendar days, each with at least one Completed Focus Session that blocked for 15 minutes or more, Breaks not counted. A session counts for the day it ends. Ended Early sessions neither count nor reset it; a Broken session resets it to zero immediately.
 _Avoid_: Chain, run

@@ -109,6 +109,23 @@ class StatsCalculatorTest {
     }
 
     @Test
+    fun breaksDoNotCountTowardTheStreakMinimum() {
+        val fifteenWithABreak = session(
+            "2026-01-07T09:00",
+            15.minutes,
+            breaks = listOf(Break(at("2026-01-07T09:05"), at("2026-01-07T09:10"))),
+        )
+        val twentyWithABreak = session(
+            "2026-01-07T10:00",
+            20.minutes,
+            breaks = listOf(Break(at("2026-01-07T10:05"), at("2026-01-07T10:10"))),
+        )
+
+        assertEquals(0, stats("2026-01-07T20:00", fifteenWithABreak).currentStreak)
+        assertEquals(1, stats("2026-01-07T20:00", twentyWithABreak).currentStreak)
+    }
+
+    @Test
     fun shortSessionsDoNotCount() {
         val s = stats(
             "2026-01-07T20:00",
