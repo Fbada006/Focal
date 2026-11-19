@@ -8,6 +8,7 @@ import io.disruption.focal.core.session.ExitCountdown
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.ui.home.everySecond
 import io.disruption.focal.ui.mvi.MviViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -49,6 +50,9 @@ class ExitCountdownViewModel(
     private val id = FocusSessionId(sessionId)
     private var countdown: ExitCountdown? = null
 
+    /** A start that hasn't come back from the service yet; leaving must cancel it too. */
+    private var starting: Job? = null
+
     init {
         viewModelScope.launch {
             sessions.running.collect { running ->
@@ -78,7 +82,8 @@ class ExitCountdownViewModel(
     }
 
     private fun begin() {
-        viewModelScope.launch {
+        starting?.cancel()
+        starting = viewModelScope.launch {
             when (val result = sessions.beginExitCountdown(id)) {
                 is CountdownResult.Started -> {
                     countdown = result.countdown
@@ -90,8 +95,15 @@ class ExitCountdownViewModel(
         }
     }
 
+    /**
+     * Leaving cancels the countdown, including one still starting: otherwise it could finish while
+     * Focal is in the background and Confirm would be enabled without the wait (GLOSSARY).
+     */
     private fun cancel() {
-        if (countdown == null) return
+        val wasStarting = starting?.isActive == true
+        if (countdown == null && !wasStarting) return
+        starting?.cancel()
+        starting = null
         countdown = null
         setState { copy(cancelled = true, canConfirm = false, secondsLeft = 30) }
         viewModelScope.launch { sessions.cancelExitCountdown(id) }

@@ -10,9 +10,13 @@ import io.disruption.focal.ui.home.HomeEffect
 import io.disruption.focal.ui.home.HomeIntent
 import io.disruption.focal.ui.home.HomeViewModel
 import io.disruption.focal.ui.social
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -93,6 +97,26 @@ class ExitCountdownViewModelTest : MainDispatcherTest() {
         vm.onIntent(ExitCountdownIntent.KeepGoingClicked)
 
         assertEquals(ExitCountdownEffect.Close, vm.effects.first())
+        assertTrue(f.sessionRepository.get(sessionId)!!.isRunning)
+    }
+
+    @Test
+    fun leavingWhileTheCountdownIsStillStartingCancelsIt() = runTest {
+        startDelayed()
+        // A real dispatcher: the start hasn't come back from the service when the user leaves.
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val vm = ExitCountdownViewModel("s1", f.sessions, f.clock, ticks)
+        vm.onIntent(ExitCountdownIntent.Shown)
+        vm.onIntent(ExitCountdownIntent.Left)
+        advanceUntilIdle()
+
+        f.clock.advanceBy(60.seconds)
+        vm.onIntent(ExitCountdownIntent.Shown)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.cancelled)
+        vm.onIntent(ExitCountdownIntent.ConfirmClicked)
+        advanceUntilIdle()
+
         assertTrue(f.sessionRepository.get(sessionId)!!.isRunning)
     }
 }
