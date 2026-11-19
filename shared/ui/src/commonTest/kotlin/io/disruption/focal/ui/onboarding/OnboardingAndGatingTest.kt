@@ -104,7 +104,7 @@ class OnboardingAndGatingTest : MainDispatcherTest() {
 
     @Test
     fun theFirstBlockListMustBlockSomething() = runTest {
-        val vm = OnboardingViewModel(permissions, f.blockLists, f.preferences, FakeSuggestedWebsites)
+        val vm = OnboardingViewModel(permissions, f.blockLists, f.preferences, FakeSuggestedWebsites, FakeDeviceHelp(oem = null))
         vm.state.value.suggestions.filter { it.selected }.forEach { vm.onIntent(OnboardingIntent.SuggestionToggled(it.id)) }
         val before = f.blockListRepository.observeAll().first().size
 
@@ -117,7 +117,7 @@ class OnboardingAndGatingTest : MainDispatcherTest() {
     @Test
     fun aDoubleTapOnCreateMakesOneBlockList() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val vm = OnboardingViewModel(permissions, f.blockLists, f.preferences, FakeSuggestedWebsites)
+        val vm = OnboardingViewModel(permissions, f.blockLists, f.preferences, FakeSuggestedWebsites, FakeDeviceHelp(oem = null))
         val before = f.blockListRepository.observeAll().first().size
 
         vm.onIntent(OnboardingIntent.CreateBlockListClicked)
