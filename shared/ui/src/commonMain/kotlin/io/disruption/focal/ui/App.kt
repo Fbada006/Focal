@@ -8,8 +8,12 @@ import androidx.navigation.toRoute
 import io.disruption.focal.ui.blocklists.AppsTabContent
 import io.disruption.focal.ui.blocklists.BlockListEditorRoute
 import io.disruption.focal.ui.blocklists.BlockListsRoute
+import io.disruption.focal.ui.home.HomeRoute
 import io.disruption.focal.ui.navigation.BlockListEditor
 import io.disruption.focal.ui.navigation.BlockLists
+import io.disruption.focal.ui.navigation.Home
+import io.disruption.focal.ui.navigation.StartSession
+import io.disruption.focal.ui.start.StartSessionRoute
 import io.disruption.focal.ui.theme.FocalTheme
 
 /** Platform-specific pieces the shared screens host. */
@@ -21,9 +25,25 @@ class PlatformContent(
 fun App(platform: PlatformContent = PlatformContent()) {
     FocalTheme {
         val nav = rememberNavController()
-        NavHost(navController = nav, startDestination = BlockLists) {
+        NavHost(navController = nav, startDestination = Home) {
+            composable<Home> {
+                HomeRoute(
+                    onOpenStart = { nav.navigate(StartSession) },
+                    onOpenBlockLists = { nav.navigate(BlockLists) },
+                )
+            }
+            composable<StartSession> {
+                StartSessionRoute(
+                    onStarted = { nav.popBackStack() },
+                    onOpenBlockLists = { nav.navigate(BlockLists) },
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable<BlockLists> {
-                BlockListsRoute(onOpenEditor = { nav.navigate(BlockListEditor(it)) })
+                BlockListsRoute(
+                    onOpenEditor = { nav.navigate(BlockListEditor(it)) },
+                    onBack = { nav.popBackStack() },
+                )
             }
             composable<BlockListEditor> { entry ->
                 val route = entry.toRoute<BlockListEditor>()

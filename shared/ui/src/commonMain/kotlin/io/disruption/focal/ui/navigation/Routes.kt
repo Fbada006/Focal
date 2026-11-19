@@ -7,3 +7,9 @@ data object BlockLists
 
 @Serializable
 data class BlockListEditor(val id: String)
+
+@Serializable
+data object Home
+
+@Serializable
+data object StartSession
