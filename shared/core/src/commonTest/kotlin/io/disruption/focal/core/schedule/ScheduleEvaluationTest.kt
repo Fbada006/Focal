@@ -118,6 +118,30 @@ class ScheduleEvaluationTest {
     }
 
     @Test
+    fun movingTheStartLaterDoesNotStartASecondSessionInTheSameWindow() = runTest {
+        f.clock.now = at("2026-01-05T09:00")
+        f.service.evaluateSchedules(listOf(workHours), berlin)
+        f.clock.now = at("2026-01-05T10:00")
+
+        val moved = workHours.copy(start = LocalTime.parse("09:30"))
+
+        assertTrue(f.service.evaluateSchedules(listOf(moved), berlin).isEmpty())
+        assertEquals(1, f.sessions.all.size)
+    }
+
+    @Test
+    fun aSessionEndedEarlyIsNotRestartedAfterTheStartIsMoved() = runTest {
+        val normal = workHours.copy(strictness = Strictness.Normal)
+        f.clock.now = at("2026-01-05T09:00")
+        val session = f.service.evaluateSchedules(listOf(normal), berlin).single()
+        f.clock.now = at("2026-01-05T09:20")
+        f.service.endEarly(session.id)
+        f.clock.now = at("2026-01-05T10:00")
+
+        assertTrue(f.service.evaluateSchedules(listOf(normal.copy(start = LocalTime.parse("09:30"))), berlin).isEmpty())
+    }
+
+    @Test
     fun theNextWindowStartsItsOwnSession() = runTest {
         f.clock.now = at("2026-01-05T09:00")
         f.service.evaluateSchedules(listOf(workHours), berlin)

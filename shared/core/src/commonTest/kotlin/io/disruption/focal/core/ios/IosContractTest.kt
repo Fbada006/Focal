@@ -217,4 +217,26 @@ class IosContractTest {
         val f = SessionTestFixture()
         assertEquals(0, ingestOnLaunch(f.service, null).sessionsStarted)
     }
+
+    @Test
+    fun aScheduleStartForAWindowTheAppAlreadyStartedIsSkipped() = runTest {
+        val f = SessionTestFixture()
+        val start = f.clock.now
+        val appStarted = io.disruption.focal.core.model.FocusSession(
+            id = FocusSessionId("fs-app"),
+            blockListId = socialList.id,
+            name = "Evening",
+            strictness = Strictness.Delayed,
+            startedAt = start,
+            plannedEnd = start + 2.hours,
+            blocked = socialList.blocked,
+            scheduleId = ScheduleId("sch"),
+        )
+        f.sessions.save(appStarted)
+
+        val report = f.service.ingest(listOf(scheduleStart(start + 1.minutes)))
+
+        assertEquals(0, report.sessionsStarted)
+        assertEquals(1, f.sessions.all.size)
+    }
 }
