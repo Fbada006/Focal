@@ -17,6 +17,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.hours
@@ -31,7 +32,7 @@ private class YieldingBlockListRepository(
     }
 }
 
-class BlockListDeleteLockTest {
+class BlockListConcurrencyTest {
     @Test
     fun aListCannotBeDeletedWhileASessionIsStartingOnIt() = runTest {
         val blockLists = YieldingBlockListRepository(InMemoryBlockListRepository(socialList))
@@ -54,5 +55,17 @@ class BlockListDeleteLockTest {
         } else {
             assertIs<DeleteResult.Deleted>(deleted)
         }
+    }
+
+    @Test
+    fun quickTogglesOfDifferentAppsAllLand() = runTest {
+        val blockLists = YieldingBlockListRepository(InMemoryBlockListRepository(socialList))
+        val service = BlockListService(blockLists, InMemoryFocusSessionRepository())
+
+        val a = async { service.toggleApp(socialList.id, "com.a") }
+        val b = async { service.toggleApp(socialList.id, "com.b") }
+        a.await(); b.await()
+
+        assertEquals(socialList.blocked.apps + setOf("com.a", "com.b"), blockLists.get(socialList.id)!!.blocked.apps)
     }
 }
