@@ -13,3 +13,6 @@ data object Home
 
 @Serializable
 data object StartSession
+
+@Serializable
+data class ExitCountdown(val sessionId: String)

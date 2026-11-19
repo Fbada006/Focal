@@ -20,7 +20,7 @@ data class RunningSessionRow(
     val name: String,
     val strictness: Strictness,
     val timeLeft: String,
-    /** Only Normal sessions can be ended straight from Home. */
+    /** Normal sessions end at once; Delayed ones go through the Exit Countdown. Locked can't end. */
     val canEnd: Boolean,
     val fromSchedule: Boolean,
 )
@@ -39,6 +39,7 @@ sealed interface HomeIntent {
 sealed interface HomeEffect {
     data object OpenStart : HomeEffect
     data object OpenBlockLists : HomeEffect
+    data class OpenExitCountdown(val sessionId: String) : HomeEffect
 }
 
 class HomeViewModel(
@@ -58,7 +59,16 @@ class HomeViewModel(
         when (intent) {
             HomeIntent.StartClicked -> emit(HomeEffect.OpenStart)
             HomeIntent.BlockListsClicked -> emit(HomeEffect.OpenBlockLists)
-            is HomeIntent.EndClicked -> viewModelScope.launch { sessions.endEarly(FocusSessionId(intent.sessionId)) }
+            is HomeIntent.EndClicked -> end(intent.sessionId)
+        }
+    }
+
+    private fun end(sessionId: String) {
+        val row = currentState.running.firstOrNull { it.id == sessionId } ?: return
+        when (row.strictness) {
+            Strictness.Normal -> viewModelScope.launch { sessions.endEarly(FocusSessionId(sessionId)) }
+            Strictness.Delayed -> emit(HomeEffect.OpenExitCountdown(sessionId))
+            Strictness.Locked -> Unit
         }
     }
 
@@ -77,7 +87,7 @@ class HomeViewModel(
                         name = session.name,
                         strictness = session.strictness,
                         timeLeft = formatTimeLeft(session.timeLeft(now)),
-                        canEnd = session.strictness == Strictness.Normal,
+                        canEnd = session.strictness != Strictness.Locked,
                         fromSchedule = session.scheduleId != null,
                     )
                 },
