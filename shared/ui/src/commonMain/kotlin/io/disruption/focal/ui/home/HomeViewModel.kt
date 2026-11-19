@@ -38,8 +38,10 @@ data class HomeState(
     val running: List<RunningSessionRow> = emptyList(),
     /** Required permissions that are missing; starting a session is disabled until fixed. */
     val missingPermissions: List<Permission> = emptyList(),
+    /** Until the first check returns, Start stays disabled rather than briefly looking available. */
+    val permissionsChecked: Boolean = false,
 ) {
-    val canStart: Boolean get() = missingPermissions.isEmpty()
+    val canStart: Boolean get() = permissionsChecked && missingPermissions.isEmpty()
 }
 
 sealed interface HomeIntent {
@@ -99,7 +101,7 @@ class HomeViewModel(
     private fun refreshPermissions() {
         viewModelScope.launch {
             val missing = permissions.missing()
-            setState { copy(missingPermissions = missing) }
+            setState { copy(missingPermissions = missing, permissionsChecked = true) }
         }
     }
 

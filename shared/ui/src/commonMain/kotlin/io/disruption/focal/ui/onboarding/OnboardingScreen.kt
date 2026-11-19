@@ -97,7 +97,11 @@ fun OnboardingScreen(state: OnboardingState, onIntent: (OnboardingIntent) -> Uni
                         )
                     }
                 }
-                Button(onClick = { onIntent(OnboardingIntent.CreateBlockListClicked) }, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { onIntent(OnboardingIntent.CreateBlockListClicked) },
+                    enabled = !state.creating,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Text("Create and start a Focus Session")
                 }
             }

@@ -8,10 +8,17 @@ import io.disruption.focal.ui.SessionUiFixture
 import io.disruption.focal.ui.home.HomeEffect
 import io.disruption.focal.ui.home.HomeIntent
 import io.disruption.focal.ui.home.HomeViewModel
+import io.disruption.focal.ui.home.HomeState
+import io.disruption.focal.ui.start.StartSessionIntent
+import io.disruption.focal.ui.start.StartSessionState
 import io.disruption.focal.ui.start.StartSessionViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -73,5 +80,49 @@ class OnboardingAndGatingTest : MainDispatcherTest() {
         val vm = StartSessionViewModel(f.blockLists, f.sessions, f.clock, f.zone, permissions)
         assertTrue(vm.state.value.permissionMissing)
         assertFalse(vm.state.value.canStart)
+    }
+
+    @Test
+    fun theStartScreenChecksAgainWhenFocalComesBack() = runTest {
+        val vm = StartSessionViewModel(f.blockLists, f.sessions, f.clock, f.zone, permissions)
+        vm.onIntent(StartSessionIntent.FixPermissionClicked(Permission.Notifications))
+        assertEquals(listOf(Permission.Notifications), permissions.requested)
+
+        permissions.granted += setOf(Permission.AccessibilityService, Permission.Notifications)
+        vm.onIntent(StartSessionIntent.Resumed)
+
+        assertFalse(vm.state.value.permissionMissing)
+        assertTrue(vm.state.value.canStart, "the fixture's Social list is preselected")
+    }
+
+    @Test
+    fun startIsDisabledUntilPermissionsHaveBeenChecked() {
+        assertFalse(HomeState(missingPermissions = emptyList()).canStart)
+        assertFalse(StartSessionState().canStart)
+    }
+
+    @Test
+    fun theFirstBlockListMustBlockSomething() = runTest {
+        val vm = OnboardingViewModel(permissions, f.blockLists, f.preferences, FakeSuggestedWebsites)
+        vm.state.value.suggestions.filter { it.selected }.forEach { vm.onIntent(OnboardingIntent.SuggestionToggled(it.id)) }
+        val before = f.blockListRepository.observeAll().first().size
+
+        vm.onIntent(OnboardingIntent.CreateBlockListClicked)
+
+        assertEquals(before, f.blockListRepository.observeAll().first().size)
+        assertTrue(vm.state.value.error != null)
+    }
+
+    @Test
+    fun aDoubleTapOnCreateMakesOneBlockList() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val vm = OnboardingViewModel(permissions, f.blockLists, f.preferences, FakeSuggestedWebsites)
+        val before = f.blockListRepository.observeAll().first().size
+
+        vm.onIntent(OnboardingIntent.CreateBlockListClicked)
+        vm.onIntent(OnboardingIntent.CreateBlockListClicked)
+        advanceUntilIdle()
+
+        assertEquals(before + 1, f.blockListRepository.observeAll().first().size)
     }
 }

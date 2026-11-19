@@ -23,6 +23,8 @@ data class OnboardingState(
     val blockListName: String = "Distractions",
     val suggestions: List<SuggestionChoice> = emptyList(),
     val error: String? = null,
+    /** The first Block List is being created; Create is disabled so a double tap makes one list. */
+    val creating: Boolean = false,
 )
 
 sealed interface OnboardingIntent {
@@ -37,7 +39,10 @@ sealed interface OnboardingIntent {
 }
 
 sealed interface OnboardingEffect {
-    /** Onboarding is done: go straight to starting the first Focus Session. */
+    /**
+     * Onboarding is done: open the Start screen with the new (and only) Block List selected, one
+     * tap from the first Focus Session.
+     */
     data object StartFirstSession : OnboardingEffect
 }
 
@@ -92,10 +97,17 @@ class OnboardingViewModel(
 
     private fun createBlockList() {
         val state = currentState
+        if (state.creating) return
+        if (state.suggestions.none { it.selected }) {
+            // An empty first list couldn't start a session, and the Start screen would be stuck.
+            setState { copy(error = "Pick at least one website to block.") }
+            return
+        }
+        setState { copy(creating = true, error = null) }
         viewModelScope.launch {
             val created = blockLists.create(state.blockListName)
             if (created !is BlockListResult.Saved) {
-                setState { copy(error = "Give the Block List a name") }
+                setState { copy(error = "Give the Block List a name", creating = false) }
                 return@launch
             }
             val domains = suggested.services
