@@ -1,9 +1,12 @@
 package io.disruption.focal
 
 import io.disruption.focal.core.blocking.BlockingEngine
+import io.disruption.focal.core.blocklist.BlockListService
 import io.disruption.focal.core.ios.ingestOnLaunch
+import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.session.FocusSessionService
+import io.disruption.focal.ui.blocking.IosScreenTimeBridge
 import io.disruption.focal.ui.di.iosUiModule
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.MainScope
@@ -32,7 +35,14 @@ fun startFocal(
     permissionGateway: PermissionGateway = PendingPermissionGateway(),
 ) {
     val koin = initKoin(blockingEngine, permissionGateway, platformModules = listOf(iosUiModule)).koin
-    MainScope().launch { ingestOnLaunch(koin.get<FocusSessionService>(), readExtensionEvents()) }
+    val scope = MainScope()
+    scope.launch { ingestOnLaunch(koin.get<FocusSessionService>(), readExtensionEvents()) }
+    // Apple's picker is Swift; it hands the serialised tokens back here (T15).
+    IosScreenTimeBridge.saveSelection = { blockListId, apps, categories ->
+        scope.launch {
+            koin.get<BlockListService>().setAppSelection(BlockListId(blockListId), apps, categories)
+        }
+    }
 }
 
 @OptIn(ExperimentalForeignApi::class)

@@ -133,6 +133,14 @@ class BlockListService(
     suspend fun setAppCategories(id: BlockListId, categories: Set<String>): BlockListResult =
         update(id) { it.copy(blocked = it.blocked.copy(appCategories = categories)) }
 
+    /**
+     * Replace the iOS Screen Time picker's whole selection in one edit, so a running session never
+     * sees the new apps with the old categories (T15).
+     */
+    suspend fun setAppSelection(id: BlockListId, apps: Set<String>, categories: Set<String>): BlockListResult =
+        update(id) { it.copy(blocked = it.blocked.copy(apps = apps, appCategories = categories)) }
+
+
     private suspend fun update(id: BlockListId, change: (BlockList) -> BlockList): BlockListResult = edits.withLock {
         val list = blockLists.get(id) ?: return BlockListResult.NotFound
         val updated = change(list)

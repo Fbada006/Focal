@@ -52,6 +52,16 @@ class BlockListServiceTest {
     }
 
     @Test
+    fun theIosPickerReplacesAppsAndCategoriesTogether() = runTest {
+        val saved = assertIs<BlockListResult.Saved>(
+            service.setAppSelection(socialList.id, setOf("app-token"), setOf("social")),
+        ).blockList
+
+        assertEquals(setOf("app-token"), saved.blocked.apps)
+        assertEquals(setOf("social"), saved.blocked.appCategories)
+    }
+
+    @Test
     fun addedDomainsAreNormalised() = runTest {
         assertEquals(
             DomainEditResult.Saved("youtube.com"),
