@@ -10,7 +10,6 @@ import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -31,8 +30,9 @@ class FocusSessionService(
     private val engine: BlockingEngine,
     private val clock: Clock,
     private val newId: () -> String = ::randomId,
+    lock: SessionLock = SessionLock(),
 ) {
-    private val mutex = Mutex()
+    private val mutex = lock.mutex
 
     /** Running sessions, ordered by planned end. */
     val running: Flow<List<FocusSession>> = sessions.observeRunning()
