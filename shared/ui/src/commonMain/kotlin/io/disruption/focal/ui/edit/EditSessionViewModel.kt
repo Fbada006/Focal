@@ -70,7 +70,7 @@ class EditSessionViewModel(
         val current = session ?: return
         viewModelScope.launch {
             val result = when (intent) {
-                is EditSessionIntent.ShiftEnd -> sessions.edit(id, plannedEnd = current.plannedEnd + intent.by)
+                is EditSessionIntent.ShiftEnd -> sessions.edit(id, shiftEndBy = intent.by)
                 is EditSessionIntent.StrictnessSelected -> sessions.edit(id, strictness = intent.strictness)
             }
             setState {

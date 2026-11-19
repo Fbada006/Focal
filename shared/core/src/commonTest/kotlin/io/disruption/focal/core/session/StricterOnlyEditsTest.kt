@@ -126,4 +126,14 @@ class StricterOnlyEditsTest {
         assertIs<DomainEditResult.Saved>(result)
         assertIs<EditResult.Applied>(f.service.edit(session.id, plannedEnd = session.plannedEnd + 1.hours))
     }
+
+    @Test
+    fun shiftsAddUpBecauseEachIsAppliedToTheStoredEnd() = runTest {
+        val session = f.startFor(1.hours, strictness = Strictness.Locked)
+
+        f.service.edit(session.id, shiftEndBy = 15.minutes)
+        f.service.edit(session.id, shiftEndBy = 15.minutes)
+
+        assertEquals(session.plannedEnd + 30.minutes, f.stored(session).plannedEnd)
+    }
 }

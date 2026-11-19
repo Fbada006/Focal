@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -124,6 +125,11 @@ class FocusSessionService(
             countdowns.remove(id)
             return EndResult.Ended(finish(session, Outcome.Completed, session.plannedEnd))
         }
+        // Only Delayed sessions end through a countdown. One raised to Locked mid-countdown can't.
+        if (session.strictness != Strictness.Delayed) {
+            countdowns.remove(id)
+            return EndResult.NotAllowed(session.strictness)
+        }
         val countdown = countdowns[id] ?: return EndResult.CountdownRequired
         if (now < countdown.endsAt) return EndResult.CountdownRequired
         countdowns.remove(id)
@@ -161,12 +167,14 @@ class FocusSessionService(
         id: FocusSessionId,
         plannedEnd: Instant? = null,
         strictness: Strictness? = null,
+        shiftEndBy: Duration? = null,
     ): EditResult = mutex.withLock {
         val session = sessions.get(id)?.takeIf { it.isRunning } ?: return EditResult.NotRunning
         val now = clock.now()
         if (now >= session.plannedEnd) return EditResult.NotRunning
         val weakeningAllowed = session.strictness == Strictness.Normal
-        val newEnd = plannedEnd ?: session.plannedEnd
+        // A shift is applied to the stored end, so two quick "+15 min" taps add 30 minutes.
+        val newEnd = plannedEnd ?: shiftEndBy?.let { session.plannedEnd + it } ?: session.plannedEnd
         val newStrictness = strictness ?: session.strictness
 
         if (newEnd <= now) return EditResult.Refused(EditRefusal.EndNotInFuture)
@@ -176,6 +184,8 @@ class FocusSessionService(
         }
 
         val updated = session.copy(plannedEnd = newEnd, strictness = newStrictness)
+        // An Exit Countdown belongs to a Delayed session; raising the Strictness drops it.
+        if (newStrictness != Strictness.Delayed) countdowns.remove(id)
         if (updated != session) {
             sessions.save(updated)
             engine.apply(updated)

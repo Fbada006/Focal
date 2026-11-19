@@ -37,6 +37,7 @@ fun AndroidAppsTab(
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(16.dp),
         )
+        state.notice?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp)) }
         if (state.loading) {
             CircularProgressIndicator(Modifier.padding(24.dp))
         }
