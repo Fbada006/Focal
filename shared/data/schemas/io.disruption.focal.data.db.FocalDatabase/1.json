@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "73cc3b16e830cd6fc0adf75ea7bf493e",
+    "identityHash": "3e3a4c299bb36273e20eb7eddba2729f",
     "entities": [
       {
         "tableName": "block_lists",
@@ -150,13 +150,23 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_focus_sessions_endedAt` ON `${TABLE_NAME}` (`endedAt`)"
+          },
+          {
+            "name": "index_focus_sessions_scheduleId_startedAt",
+            "unique": false,
+            "columnNames": [
+              "scheduleId",
+              "startedAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_focus_sessions_scheduleId_startedAt` ON `${TABLE_NAME}` (`scheduleId`, `startedAt`)"
           }
         ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '73cc3b16e830cd6fc0adf75ea7bf493e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3e3a4c299bb36273e20eb7eddba2729f')"
     ]
   }
 }

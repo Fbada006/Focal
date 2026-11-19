@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlin.time.Instant
 
 class InMemoryBlockListRepository(vararg initial: BlockList) : BlockListRepository {
     private val lists = MutableStateFlow(initial.associateBy { it.id })
@@ -32,6 +33,8 @@ class InMemoryFocusSessionRepository(vararg initial: FocusSession) : FocusSessio
     override fun observeAll(): Flow<List<FocusSession>> =
         sessions.map { it.values.sortedByDescending { session -> session.startedAt } }
     override suspend fun getRunning(): List<FocusSession> = running(sessions.value.values)
+    override suspend fun getStartedBySchedule(scheduleId: ScheduleId, since: Instant): List<FocusSession> =
+        sessions.value.values.filter { it.scheduleId == scheduleId && it.startedAt >= since }
     override suspend fun get(id: FocusSessionId): FocusSession? = sessions.value[id]
     override suspend fun save(session: FocusSession) = sessions.update { it + (session.id to session) }
 

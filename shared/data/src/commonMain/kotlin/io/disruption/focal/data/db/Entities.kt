@@ -20,7 +20,7 @@ data class BlockListEntity(
  */
 @Entity(
     tableName = "focus_sessions",
-    indices = [Index("outcome"), Index("endedAt")],
+    indices = [Index("outcome"), Index("endedAt"), Index("scheduleId", "startedAt")],
 )
 data class FocusSessionEntity(
     @PrimaryKey val id: String,

@@ -9,6 +9,9 @@ import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
+import io.disruption.focal.core.model.Schedule
+import io.disruption.focal.core.schedule.ScheduleWindows
+import kotlinx.datetime.TimeZone
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.core.repository.BlockListRepository
@@ -16,6 +19,7 @@ import io.disruption.focal.core.repository.FocusSessionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -90,6 +94,51 @@ class FocusSessionService(
         }
         if (session.strictness != Strictness.Normal) return EndResult.NotAllowed(session.strictness)
         EndResult.Ended(finish(session, Outcome.EndedEarly, now))
+    }
+
+    /**
+     * Whether [scheduleId] already has a session overlapping [start, end): running or finished, and
+     * whenever it started. A window gets at most one session, even if the Schedule's start time was
+     * moved after its session began, or the session was ended early.
+     */
+    private suspend fun hasSessionInWindow(scheduleId: ScheduleId, start: Instant, end: Instant): Boolean =
+        sessions.getStartedBySchedule(scheduleId, since = start - MAX_WINDOW)
+            .any { it.startedAt < end && it.plannedEnd > start }
+
+    /**
+     * Start a Focus Session for every switched-on Schedule whose window contains now and which
+     * hasn't already started one in this window (stories 52, 55–57). Call it when a Schedule's start
+     * alarm fires, when Focal starts and after the device boots. On iOS, [ingest] the extensions'
+     * events first: they start Schedule sessions while Focal isn't running (ADR 0008).
+     *
+     * A start that was missed (phone off) starts now and still ends at the window's end; a window
+     * that is already over starts nothing. Overlapping Schedules each start their own session. A
+     * window gets at most one session, so a session ended early is not started again.
+     */
+    suspend fun evaluateSchedules(schedules: List<Schedule>, zone: TimeZone): List<FocusSession> = mutex.withLock {
+        val now = clock.now()
+        val started = mutableListOf<FocusSession>()
+        for (schedule in schedules.filter { it.enabled }) {
+            val window = ScheduleWindows.current(schedule, now, zone) ?: continue
+            if (hasSessionInWindow(schedule.id, window.start, window.end)) continue
+            val blockList = blockLists.get(schedule.blockListId)
+            if (blockList == null || blockList.blocked.isEmpty) continue
+
+            val session = FocusSession(
+                id = FocusSessionId(newId()),
+                blockListId = blockList.id,
+                name = schedule.name,
+                strictness = schedule.strictness,
+                startedAt = now,
+                plannedEnd = window.end,
+                blocked = blockList.blocked,
+                scheduleId = schedule.id,
+            )
+            sessions.save(session)
+            engine.apply(session)
+            started += session
+        }
+        started
     }
 
     /**
@@ -270,6 +319,8 @@ class FocusSessionService(
                 is ExtensionEvent.ScheduleSessionStarted -> {
                     val id = FocusSessionId(event.sessionId)
                     if (sessions.get(id) != null) continue
+                    // The app may already have started this window's session itself (after a save).
+                    if (hasSessionInWindow(ScheduleId(event.scheduleId), event.at, event.plannedEnd)) continue
                     sessions.save(
                         FocusSession(
                             id = id,
@@ -330,6 +381,9 @@ class FocusSessionService(
 
 /** How long the user must wait before confirming that a Delayed session should end early. */
 val EXIT_COUNTDOWN = 30.seconds
+
+/** A Schedule's window never spans more than a day (overnight windows end the next morning). */
+private val MAX_WINDOW = 1.days
 
 @OptIn(ExperimentalUuidApi::class)
 private fun randomId(): String = Uuid.random().toString()
