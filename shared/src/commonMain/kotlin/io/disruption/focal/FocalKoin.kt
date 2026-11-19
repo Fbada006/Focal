@@ -27,6 +27,21 @@ val coreModule: Module = module {
 }
 
 /**
+ * Every shared module, with the app's [blockingEngine] and [permissionGateway]. [initKoin] starts
+ * these; `KoinGraphTest` verifies the same list, so a definition Koin can't build fails a test
+ * instead of crashing at launch.
+ */
+fun focalModules(blockingEngine: BlockingEngine, permissionGateway: PermissionGateway): List<Module> = listOf(
+    module {
+        single<BlockingEngine> { blockingEngine }
+        single<PermissionGateway> { permissionGateway }
+    },
+    coreModule,
+    dataModule,
+    uiModule,
+)
+
+/**
  * Start Koin with every shared module plus the app's [blockingEngine] and [permissionGateway].
  * Android calls this from its
  * `Application`; iOS through [startFocal].
@@ -38,14 +53,5 @@ fun initKoin(
     appDeclaration: KoinAppDeclaration = {},
 ): KoinApplication = startKoin {
     appDeclaration()
-    modules(
-        module {
-            single<BlockingEngine> { blockingEngine }
-            single<PermissionGateway> { permissionGateway }
-        },
-        coreModule,
-        dataModule,
-        uiModule,
-    )
-    modules(platformModules)
+    modules(focalModules(blockingEngine, permissionGateway) + platformModules)
 }
