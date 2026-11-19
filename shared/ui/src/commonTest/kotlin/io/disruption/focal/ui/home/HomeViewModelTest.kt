@@ -112,3 +112,22 @@ class HomeBreaksTest : MainDispatcherTest() {
         assertTrue(vm.state.value.running.none { it.canTakeBreak || it.breaksLeft != null })
     }
 }
+
+class HomeLockedTest : MainDispatcherTest() {
+    private val f = SessionUiFixture()
+    private val ticks = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    @Test
+    fun aLockedSessionOffersNoWayToEndOrPause() = runTest {
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Locked)
+        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        val row = vm.state.value.running.single()
+        assertEquals(false, row.canEnd)
+        assertEquals(false, row.canTakeBreak)
+
+        vm.onIntent(HomeIntent.EndClicked("s1"))
+        vm.onIntent(HomeIntent.TakeBreakClicked("s1"))
+
+        assertTrue(f.sessionRepository.get(io.disruption.focal.core.model.FocusSessionId("s1"))!!.isRunning)
+    }
+}

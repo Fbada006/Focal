@@ -110,6 +110,13 @@ private fun RunningSessionCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(row.timeLeft, style = MaterialTheme.typography.headlineSmall)
+            if (row.strictness == Strictness.Locked) {
+                Text(
+                    "Locked: it can't be ended until it runs out.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             row.onBreak?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             row.breaksLeft?.let { left ->
                 Text(

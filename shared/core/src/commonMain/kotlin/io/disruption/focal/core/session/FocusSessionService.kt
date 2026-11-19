@@ -151,6 +151,20 @@ class FocusSessionService(
     }
 
     /**
+     * The platform detected that blocking was defeated from outside Focal, for example a required
+     * permission was revoked (ADR 0002). Running Locked sessions are recorded as Broken and lifted;
+     * one that had already run out is Completed instead. Other Strictnesses could have been ended
+     * anyway, so they keep running and the platform asks the user to restore the permission.
+     */
+    suspend fun markBlockingDefeated(): List<FocusSession> = mutex.withLock {
+        completeDueLocked()
+        val now = clock.now()
+        sessions.getRunning()
+            .filter { it.strictness == Strictness.Locked }
+            .map { finish(it, Outcome.Broken, now) }
+    }
+
+    /**
      * Record every running session whose planned end has passed as Completed and lift its
      * blocking. Returns the sessions it completed.
      */
