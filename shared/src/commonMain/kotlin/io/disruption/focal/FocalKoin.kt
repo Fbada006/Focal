@@ -3,6 +3,7 @@ package io.disruption.focal
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.blocklist.BlockListService
 import io.disruption.focal.core.session.FocusSessionService
+import io.disruption.focal.core.session.SessionLock
 import io.disruption.focal.data.di.dataModule
 import io.disruption.focal.ui.di.uiModule
 import org.koin.core.KoinApplication
@@ -15,8 +16,9 @@ import kotlin.time.Clock
 /** The domain core's wiring. `core` itself stays free of Koin. */
 val coreModule: Module = module {
     single<Clock> { Clock.System }
-    single { FocusSessionService(get(), get(), get(), get()) }
-    single { BlockListService(get(), get()) }
+    single { SessionLock() }
+    single { FocusSessionService(get(), get(), get(), get(), lock = get()) }
+    single { BlockListService(get(), get(), lock = get()) }
 }
 
 /**
