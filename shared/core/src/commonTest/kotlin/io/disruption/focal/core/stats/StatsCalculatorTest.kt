@@ -160,7 +160,7 @@ class StatsCalculatorTest {
     }
 
     @Test
-    fun daysCompletedAfterABreakStartANewStreak() {
+    fun daysCompletedAfterABrokenSessionStartANewStreak() {
         val s = stats(
             "2026-01-07T20:00",
             session("2026-01-06T09:00", 1.hours),
