@@ -29,6 +29,7 @@ kotlin {
         compilerOptions {
             jvmTarget = JvmTarget.JVM_11
         }
+        withHostTest {}
     }
 
     compilerOptions {
@@ -41,6 +42,13 @@ kotlin {
             api(project(":shared:data"))
             api(project(":shared:ui"))
             api(libs.koin.core)
+        }
+        iosTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
+        getByName("androidHostTest").dependencies {
+            implementation(libs.kotlin.testJunit)
+            implementation(libs.koin.test)
         }
     }
 }

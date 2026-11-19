@@ -27,6 +27,7 @@ See ADR 0010. `core` has a plain `jvm()` target rather than an Android one, so A
 - UI tests (Android host): `./gradlew :shared:ui:testAndroidHostTest`
 - Repository tests need real SQLite, so they run on a device or emulator: `./gradlew :shared:data:connectedAndroidDeviceTest`
 - Shared tests (iOS simulator): `./gradlew :shared:core:iosSimulatorArm64Test :shared:data:iosSimulatorArm64Test :shared:ui:iosSimulatorArm64Test`
+- Koin wiring: `./gradlew :shared:iosSimulatorArm64Test :shared:testAndroidHostTest` (starts the iOS graph and builds every definition; statically checks the Android one)
 - iOS framework: `./gradlew :shared:linkDebugFrameworkIosSimulatorArm64` (exports `core`, `data` and `ui` as `Shared`)
 - iOS app: open `iosApp/` in Xcode. Screen Time blocking needs a physical device.
 
