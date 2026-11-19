@@ -13,7 +13,7 @@ import org.koin.dsl.module
 /** View models for the shared screens (ADR 0011). */
 val uiModule: Module = module {
     viewModel { BlockListsViewModel(get()) }
-    viewModel { (id: String) -> BlockListEditorViewModel(id, get()) }
+    viewModel { (id: String) -> BlockListEditorViewModel(id, get(), get()) }
     viewModel { HomeViewModel(get(), get()) }
     viewModel { (id: String) -> ExitCountdownViewModel(id, get(), get()) }
     viewModel { (id: String) -> EditSessionViewModel(id, get(), get(), get()) }

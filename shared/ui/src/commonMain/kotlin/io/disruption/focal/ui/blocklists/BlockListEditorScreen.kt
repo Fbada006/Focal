@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedTextField
@@ -31,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.disruption.focal.ui.components.EmptyMessage
 import io.disruption.focal.ui.components.FocalTopBar
+import io.disruption.focal.ui.components.SectionTitle
 import io.disruption.focal.ui.mvi.CollectEffects
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -170,10 +174,10 @@ private fun WebsitesTab(state: BlockListEditorState, onIntent: (BlockListEditorI
                 }
             }
         }
-        if (state.domains.isEmpty()) {
-            EmptyMessage("No websites yet.")
-        }
         LazyColumn {
+            if (state.domains.isEmpty()) {
+                item { EmptyMessage("No websites yet.") }
+            }
             items(state.domains, key = { it }) { domain ->
                 ListItem(
                     headlineContent = { Text(domain) },
@@ -185,6 +189,28 @@ private fun WebsitesTab(state: BlockListEditorState, onIntent: (BlockListEditorI
                     },
                 )
                 HorizontalDivider()
+            }
+            item { SectionTitle("Suggested") }
+            item {
+                // A suggestion is ticked when all its domains are blocked; unticking removes all of
+                // them, including any typed by hand above (decided for T25).
+                Text(
+                    "Unticking a service removes all its domains, including ones you typed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+            items(state.suggestions, key = { "suggested-${it.id}" }) { suggestion ->
+                ListItem(
+                    headlineContent = { Text(suggestion.name) },
+                    supportingContent = { Text(suggestion.domains) },
+                    trailingContent = { Checkbox(checked = suggestion.selected, onCheckedChange = null) },
+                    modifier = Modifier.toggleable(
+                        value = suggestion.selected,
+                        onValueChange = { onIntent(BlockListEditorIntent.SuggestionToggled(suggestion.id)) },
+                    ),
+                )
             }
         }
     }

@@ -106,6 +106,13 @@ class BlockListService(
             it.copy(blocked = it.blocked.copy(apps = if (packageName in apps) apps - packageName else apps + packageName))
         }
 
+    /** Add already-normalised domains, such as a Suggested Website's. */
+    suspend fun addDomains(id: BlockListId, hostnames: Set<String>): BlockListResult =
+        update(id) { it.withDomains(it.blocked.domains + hostnames.mapNotNull(Domains::normaliseOrNull)) }
+
+    suspend fun removeDomains(id: BlockListId, hostnames: Set<String>): BlockListResult =
+        update(id) { it.withDomains(it.blocked.domains - hostnames) }
+
     /** Replace the list's individually picked apps. */
     suspend fun setApps(id: BlockListId, apps: Set<String>): BlockListResult =
         update(id) { it.copy(blocked = it.blocked.copy(apps = apps)) }
