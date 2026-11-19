@@ -10,7 +10,18 @@
       "name": "Work hours",
       "blockListId": "bl-social",
       "strictness": "Delayed",
-      "plannedEnd": "2026-01-05T17:30:00Z"
+      "plannedEnd": "2026-01-05T17:30:00Z",
+      "apps": [
+        "app-token-instagram",
+        "app-token-tiktok"
+      ],
+      "appCategories": [
+        "cat-token-social"
+      ],
+      "domains": [
+        "reddit.com",
+        "x.com"
+      ]
     },
     {
       "type": "breakEnded",

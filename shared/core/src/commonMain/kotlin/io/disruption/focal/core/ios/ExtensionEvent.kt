@@ -32,6 +32,14 @@ sealed interface ExtensionEvent {
         val strictness: String,
         @Serializable(IsoInstantSerializer::class)
         val plannedEnd: Instant,
+        /**
+         * What the extension actually applied, copied from the snapshot's Block List when the
+         * session started. The session keeps this copy (ADR 0007), even if the list was edited or
+         * deleted before the app ingests the event.
+         */
+        val apps: List<String>,
+        val appCategories: List<String>,
+        val domains: List<String>,
     ) : ExtensionEvent
 
     /** The window of a Schedule-started session ended and the extension cleared its store. */
@@ -44,7 +52,11 @@ sealed interface ExtensionEvent {
         val sessionId: String,
     ) : ExtensionEvent
 
-    /** A Break ended and the extension re-applied the session's store. */
+    /**
+     * A Break ended and the extension re-applied the session's store at [at]. If that was before
+     * the Break's recorded end (DeviceActivity fires on its own schedule), the Break is cut short to
+     * match what actually happened.
+     */
     @Serializable
     @SerialName("breakEnded")
     data class BreakEnded(

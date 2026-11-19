@@ -111,21 +111,27 @@ class FocusSessionService(
     suspend fun ingest(events: List<ExtensionEvent>): IngestReport = mutex.withLock {
         var started = 0
         var ended = 0
+        var breaksEnded = 0
         for (event in events.sortedBy { it.at }) {
             when (event) {
                 is ExtensionEvent.ScheduleSessionStarted -> {
                     val id = FocusSessionId(event.sessionId)
                     if (sessions.get(id) != null) continue
-                    val blockList = blockLists.get(BlockListId(event.blockListId))
                     sessions.save(
                         FocusSession(
                             id = id,
                             blockListId = BlockListId(event.blockListId),
                             name = event.name,
-                            strictness = Strictness.entries.firstOrNull { it.name == event.strictness } ?: Strictness.Normal,
+                            // An unreadable Strictness must never make a session weaker than it was.
+                            strictness = Strictness.entries.firstOrNull { it.name == event.strictness } ?: Strictness.Locked,
                             startedAt = event.at,
                             plannedEnd = event.plannedEnd,
-                            blocked = blockList?.blocked ?: BlockedSet.Empty,
+                            // The extension's copy, not the list as it is now (ADR 0007).
+                            blocked = BlockedSet(
+                                apps = event.apps.toSet(),
+                                appCategories = event.appCategories.toSet(),
+                                domains = event.domains.toSet(),
+                            ),
                             scheduleId = ScheduleId(event.scheduleId),
                         ),
                     )
@@ -137,11 +143,21 @@ class FocusSessionService(
                     finish(session, Outcome.Completed, session.plannedEnd)
                     ended++
                 }
-                // Breaks don't change the outcome or the end time; the app already recorded it.
-                is ExtensionEvent.BreakEnded -> Unit
+                // Breaks never change the outcome or the end time. Blocking came back at event.at, so
+                // a Break recorded as running past that is cut short to match.
+                is ExtensionEvent.BreakEnded -> {
+                    val session = sessions.get(FocusSessionId(event.sessionId))?.takeIf { it.isRunning } ?: continue
+                    val breaks = session.breaks.map { b ->
+                        if (event.at > b.startedAt && event.at < b.endsAt) b.copy(endsAt = event.at) else b
+                    }
+                    if (breaks != session.breaks) {
+                        sessions.save(session.copy(breaks = breaks))
+                        breaksEnded++
+                    }
+                }
             }
         }
-        IngestReport(sessionsStarted = started, sessionsCompleted = ended)
+        IngestReport(sessionsStarted = started, sessionsCompleted = ended, breaksEnded = breaksEnded)
     }
 
     private suspend fun completeDueLocked(): List<FocusSession> {

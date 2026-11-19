@@ -18,4 +18,4 @@ sealed interface EndResult {
     data class NotAllowed(val strictness: Strictness) : EndResult
 }
 
-data class IngestReport(val sessionsStarted: Int, val sessionsCompleted: Int)
+data class IngestReport(val sessionsStarted: Int, val sessionsCompleted: Int, val breaksEnded: Int = 0)

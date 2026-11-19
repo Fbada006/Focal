@@ -1,5 +1,6 @@
 package io.disruption.focal.core.ios
 
+import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.ScheduleId
@@ -12,7 +13,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+
+private val socialApps = socialList.blocked.apps.toList()
+private val socialDomains = socialList.blocked.domains.toList()
+
+private fun scheduleStart(
+    start: Instant,
+    strictness: String = "Delayed",
+    blockListId: String = socialList.id.value,
+) = ExtensionEvent.ScheduleSessionStarted(
+    "ev-start", start, "fs-ios", "sch", "Evening", blockListId, strictness, start + 2.hours,
+    socialApps, emptyList(), socialDomains,
+)
 
 class IosContractTest {
 
@@ -83,6 +97,9 @@ class IosContractTest {
             blockListId = socialList.id.value,
             strictness = "Locked",
             plannedEnd = f.clock.now + 2.hours,
+            apps = socialList.blocked.apps.toList(),
+            appCategories = socialList.blocked.appCategories.toList(),
+            domains = socialList.blocked.domains.toList(),
         )
 
         val report = f.service.ingest(listOf(event))
@@ -108,7 +125,7 @@ class IosContractTest {
         val start = f.clock.now - 3.hours
         f.service.ingest(
             listOf(
-                ExtensionEvent.ScheduleSessionStarted("ev-1", start, "fs-ios", "sch", "Evening", socialList.id.value, "Delayed", start + 2.hours),
+                ExtensionEvent.ScheduleSessionStarted("ev-1", start, "fs-ios", "sch", "Evening", socialList.id.value, "Delayed", start + 2.hours, socialApps, emptyList(), socialDomains),
                 ExtensionEvent.BreakEnded("ev-2", start + 1.hours, "fs-ios"),
                 ExtensionEvent.ScheduleSessionEnded("ev-3", start + 2.hours, "fs-ios"),
             ),
@@ -125,10 +142,79 @@ class IosContractTest {
         val start = f.clock.now
         f.service.ingest(
             listOf(
-                ExtensionEvent.ScheduleSessionStarted("ev-1", start, "fs-ios", "sch", "Evening", socialList.id.value, "Locked", start + 2.hours),
+                ExtensionEvent.ScheduleSessionStarted("ev-1", start, "fs-ios", "sch", "Evening", socialList.id.value, "Locked", start + 2.hours, socialApps, emptyList(), socialDomains),
                 ExtensionEvent.ScheduleSessionEnded("ev-2", start + 1.hours, "fs-ios"),
             ),
         )
         assertTrue(f.sessions.get(FocusSessionId("fs-ios"))!!.isRunning)
+    }
+
+    @Test
+    fun anIngestedSessionKeepsTheExtensionsCopyEvenIfTheListIsGone() = runTest {
+        val f = SessionTestFixture()
+        f.blockLists.delete(socialList.id)
+
+        f.service.ingest(listOf(scheduleStart(f.clock.now, strictness = "Locked")))
+
+        val session = f.sessions.get(FocusSessionId("fs-ios"))!!
+        assertEquals(socialList.blocked.apps, session.blocked.apps)
+        assertEquals(socialList.blocked.domains, session.blocked.domains)
+    }
+
+    @Test
+    fun anUnknownStrictnessIsTreatedAsLocked() = runTest {
+        val f = SessionTestFixture()
+
+        f.service.ingest(listOf(scheduleStart(f.clock.now, strictness = "locked")))
+
+        assertEquals(Strictness.Locked, f.sessions.get(FocusSessionId("fs-ios"))!!.strictness)
+    }
+
+    @Test
+    fun aBreakEndedEarlyIsCutShort() = runTest {
+        val f = SessionTestFixture()
+        val start = f.clock.now - 1.hours
+        f.service.ingest(listOf(scheduleStart(start)))
+        val stored = f.sessions.get(FocusSessionId("fs-ios"))!!
+        f.sessions.save(stored.copy(breaks = listOf(Break(start + 10.minutes, start + 15.minutes))))
+
+        val report = f.service.ingest(listOf(ExtensionEvent.BreakEnded("ev-b", start + 13.minutes, "fs-ios")))
+
+        assertEquals(1, report.breaksEnded)
+        assertEquals(listOf(Break(start + 10.minutes, start + 13.minutes)), f.sessions.get(FocusSessionId("fs-ios"))!!.breaks)
+    }
+
+    @Test
+    fun aBreakEndedOnTimeChangesNothing() = runTest {
+        val f = SessionTestFixture()
+        val start = f.clock.now - 1.hours
+        f.service.ingest(listOf(scheduleStart(start)))
+        val stored = f.sessions.get(FocusSessionId("fs-ios"))!!
+        val onBreak = stored.copy(breaks = listOf(Break(start + 10.minutes, start + 15.minutes)))
+        f.sessions.save(onBreak)
+
+        val report = f.service.ingest(listOf(ExtensionEvent.BreakEnded("ev-b", start + 15.minutes, "fs-ios")))
+
+        assertEquals(0, report.breaksEnded)
+        assertEquals(onBreak.breaks, f.sessions.get(FocusSessionId("fs-ios"))!!.breaks)
+    }
+
+    @Test
+    fun onLaunchTheLogIsIngestedAndRunningSessionsReapplied() = runTest {
+        val f = SessionTestFixture()
+        val log = IosContract.encodeEvents(ExtensionEventLog(events = listOf(scheduleStart(f.clock.now))))
+
+        val report = ingestOnLaunch(f.service, log)
+        ingestOnLaunch(f.service, log)
+
+        assertEquals(1, report.sessionsStarted)
+        assertEquals(1, f.sessions.all.size)
+        assertTrue(FocusSessionId("fs-ios") in f.engine.applied)
+    }
+
+    @Test
+    fun onLaunchWithoutALogNothingIsIngested() = runTest {
+        val f = SessionTestFixture()
+        assertEquals(0, ingestOnLaunch(f.service, null).sessionsStarted)
     }
 }
