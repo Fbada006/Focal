@@ -15,6 +15,10 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
   - Only act on the committed URL, not partial text while the user is typing in the address bar (e.g. check when the bar loses focus or the page's content changes).
 - **`UsageStatsManager`** (usage access) is *not* a blocking signal — polling `queryEvents` for `ACTIVITY_RESUMED` is too slow. Possible later uses: fallback when accessibility is off, a cross-check, and per-app screen-time stats. Not needed for v1 unless stats require it.
 
+### App Categories
+
+- A running session's `BlockedSet.appCategories` holds App Category keys. For each foreground package, the engine resolves its category with `AppCategoryResolver` (Focal's curated list in `shared/data`, falling back to Android's `ApplicationInfo.category`) and checks `BlockedSet.blocksApp(packageName, category)`. Because this runs per foreground event, apps installed after the session started are covered too.
+
 ### Package visibility
 
 - The Apps tab lists launchable apps via a `<queries>` entry for the `MAIN`/`LAUNCHER` intent. Every app a user can open from the launcher is visible this way, and those are the only apps worth blocking, so Focal does **not** request `QUERY_ALL_PACKAGES` (which Play restricts to apps whose core purpose needs it).

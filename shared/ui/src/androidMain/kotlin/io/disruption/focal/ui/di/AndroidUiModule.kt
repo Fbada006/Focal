@@ -10,5 +10,5 @@ import org.koin.dsl.module
 /** Android-only screens and their data sources. */
 val androidUiModule: Module = module {
     single<InstalledAppsSource> { AndroidInstalledApps(get()) }
-    viewModel { (id: String) -> AppPickerViewModel(id, get(), get(), get()) }
+    viewModel { (id: String) -> AppPickerViewModel(id, get(), get(), get(), get()) }
 }

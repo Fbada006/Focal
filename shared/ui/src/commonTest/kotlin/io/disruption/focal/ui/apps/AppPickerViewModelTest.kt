@@ -1,5 +1,6 @@
 package io.disruption.focal.ui.apps
 
+import io.disruption.focal.core.apps.AppCategoryResolver
 import io.disruption.focal.core.apps.InstalledApp
 import io.disruption.focal.core.apps.InstalledAppsSource
 import io.disruption.focal.ui.MainDispatcherTest
@@ -24,7 +25,7 @@ class AppPickerViewModelTest : MainDispatcherTest() {
         )
     }
 
-    private fun vm() = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites)
+    private fun vm() = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, AppCategoryResolver(emptyMap()))
 
     @Test
     fun listsInstalledAppsWithSelectedOnesFirst() = runTest {
@@ -59,6 +60,17 @@ class AppPickerViewModelTest : MainDispatcherTest() {
 
         assertNotNull(vm.state.value.notice)
     }
+
+    @Test
+    fun unpickingACategoryARunningDelayedSessionUsesSaysTheRemovalIsDeferred() = runTest {
+        val vm = vm()
+        vm.onIntent(AppPickerIntent.CategoryToggled("games"))
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Delayed)
+
+        vm.onIntent(AppPickerIntent.CategoryToggled("games"))
+
+        assertNotNull(vm.state.value.notice)
+    }
 }
 
 class AppPickerSuggestionsTest : MainDispatcherTest() {
@@ -69,7 +81,7 @@ class AppPickerSuggestionsTest : MainDispatcherTest() {
 
     @Test
     fun pickingAnAppPreselectsItsSuggestedWebsites() = runTest {
-        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites)
+        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, AppCategoryResolver(emptyMap()))
         vm.onIntent(AppPickerIntent.Toggled("com.google.android.youtube"))
         vm.onIntent(AppPickerIntent.Toggled("com.android.chrome"))
 
@@ -78,10 +90,37 @@ class AppPickerSuggestionsTest : MainDispatcherTest() {
 
     @Test
     fun unpickingAnAppKeepsItsWebsites() = runTest {
-        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites)
+        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, AppCategoryResolver(emptyMap()))
         vm.onIntent(AppPickerIntent.Toggled("com.google.android.youtube"))
         vm.onIntent(AppPickerIntent.Toggled("com.google.android.youtube"))
 
         assertEquals(setOf("youtube.com", "youtu.be"), f.blockListRepository.get(social.id)!!.blocked.domains)
+    }
+}
+
+class AppCategoriesPickerTest : MainDispatcherTest() {
+    private val f = SessionUiFixture()
+    private val installed = InstalledAppsSource {
+        listOf(
+            InstalledApp("com.instagram.android", "Instagram"),
+            InstalledApp("com.example.game", "Some Game", systemCategory = "games"),
+            InstalledApp("com.example.notes", "Notes"),
+        )
+    }
+    private val resolver = AppCategoryResolver(mapOf("com.instagram.android" to io.disruption.focal.core.apps.AppCategory.Social))
+
+    @Test
+    fun showsCategoriesWithInstalledCountsAndSavesPickedOnes() = runTest {
+        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, resolver)
+        val games = vm.state.value.categories.single { it.key == "games" }
+        assertEquals(1, games.installedCount)
+        assertEquals("Social", vm.state.value.apps.single { it.label == "Instagram" }.category)
+
+        vm.onIntent(AppPickerIntent.CategoryToggled("games"))
+        vm.onIntent(AppPickerIntent.CategoryToggled("social"))
+        vm.onIntent(AppPickerIntent.CategoryToggled("social"))
+
+        assertEquals(setOf("games"), f.blockListRepository.get(social.id)!!.blocked.appCategories)
+        assertEquals(true, vm.state.value.categories.single { it.key == "games" }.selected)
     }
 }

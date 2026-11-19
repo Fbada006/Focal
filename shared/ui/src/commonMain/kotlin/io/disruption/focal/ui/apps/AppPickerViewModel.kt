@@ -1,6 +1,8 @@
 package io.disruption.focal.ui.apps
 
 import androidx.lifecycle.viewModelScope
+import io.disruption.focal.core.apps.AppCategory
+import io.disruption.focal.core.apps.AppCategoryResolver
 import io.disruption.focal.core.apps.InstalledApp
 import io.disruption.focal.core.apps.InstalledAppsSource
 import io.disruption.focal.core.blocklist.BlockListResult
@@ -14,7 +16,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 
-data class AppRow(val packageName: String, val label: String, val selected: Boolean)
+data class AppRow(val packageName: String, val label: String, val selected: Boolean, val category: String? = null)
+
+data class CategoryRow(val key: String, val label: String, val selected: Boolean, val installedCount: Int)
 
 data class AppPickerState(
     val loading: Boolean = true,
@@ -24,11 +28,14 @@ data class AppPickerState(
     val selectedCount: Int = 0,
     /** Set when an unticked app keeps being blocked by a running Delayed or Locked session. */
     val notice: String? = null,
+    /** Whole App Categories; picking one also covers apps installed later (story 18). */
+    val categories: List<CategoryRow> = emptyList(),
 )
 
 sealed interface AppPickerIntent {
     data class QueryChanged(val query: String) : AppPickerIntent
     data class Toggled(val packageName: String) : AppPickerIntent
+    data class CategoryToggled(val key: String) : AppPickerIntent
 }
 
 /**
@@ -41,23 +48,31 @@ class AppPickerViewModel(
     private val blockLists: BlockListService,
     private val installedApps: InstalledAppsSource,
     private val suggested: SuggestedWebsitesCatalog,
+    private val categories: AppCategoryResolver,
 ) : MviViewModel<AppPickerState, AppPickerIntent, Nothing>(AppPickerState()) {
     private val id = BlockListId(blockListId)
     private val installed = MutableStateFlow<List<InstalledApp>?>(null)
     private val query = MutableStateFlow("")
     private val notice = MutableStateFlow<String?>(null)
-
     init {
         viewModelScope.launch { installed.value = installedApps.launchableApps() }
         viewModelScope.launch {
-            val selection = blockLists.observeAll().mapNotNull { lists -> lists.firstOrNull { it.id == id }?.blocked?.apps }
-            combine(installed, query, selection, notice) { apps, query, selection, notice ->
+            val blocked = blockLists.observeAll().mapNotNull { lists -> lists.firstOrNull { it.id == id }?.blocked }
+            combine(installed, query, blocked, notice) { apps, query, blocked, notice ->
                 AppPickerState(
                     loading = apps == null,
                     query = query,
-                    apps = rows(apps.orEmpty(), query, selection),
-                    selectedCount = selection.size,
+                    apps = rows(apps.orEmpty(), query, blocked.apps),
+                    selectedCount = blocked.apps.size,
                     notice = notice,
+                    categories = AppCategory.entries.map { category ->
+                        CategoryRow(
+                            key = category.key,
+                            label = category.label,
+                            selected = category.key in blocked.appCategories,
+                            installedCount = apps.orEmpty().count { categoryOf(it) == category },
+                        )
+                    },
                 )
             }.collect { state -> setState { state } }
         }
@@ -66,6 +81,10 @@ class AppPickerViewModel(
     override fun onIntent(intent: AppPickerIntent) {
         when (intent) {
             is AppPickerIntent.QueryChanged -> query.value = intent.query
+            is AppPickerIntent.CategoryToggled -> viewModelScope.launch {
+                val saved = blockLists.toggleAppCategory(id, intent.key) as? BlockListResult.Saved ?: return@launch
+                showDeferred(saved.removalsDeferredFor)
+            }
             is AppPickerIntent.Toggled -> viewModelScope.launch {
                 val pkg = intent.packageName
                 val saved = blockLists.toggleApp(id, pkg) as? BlockListResult.Saved ?: return@launch
@@ -82,12 +101,13 @@ class AppPickerViewModel(
     private fun showDeferred(sessionNames: List<String>) {
         if (sessionNames.isNotEmpty()) notice.value = deferredMessage(sessionNames)
     }
+    private fun categoryOf(app: InstalledApp) = categories.categoryOf(app.packageName, app.systemCategory)
 
     private fun rows(apps: List<InstalledApp>, query: String, selection: Set<String>): List<AppRow> {
         val needle = query.trim()
         return apps
             .filter { needle.isEmpty() || it.label.contains(needle, ignoreCase = true) }
-            .map { AppRow(it.packageName, it.label, it.packageName in selection) }
+            .map { AppRow(it.packageName, it.label, it.packageName in selection, categoryOf(it)?.label) }
             .sortedWith(compareByDescending<AppRow> { it.selected }.thenBy { it.label.lowercase() })
     }
 }
