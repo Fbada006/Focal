@@ -24,3 +24,13 @@ internal fun Strictness.description(): String = when (this) {
     Strictness.Delayed -> "Ending early takes a 30-second wait. Up to three 5-minute Breaks."
     Strictness.Locked -> "Can't be ended until it runs out."
 }
+
+/** "45 min", "2 h", "1 h 30 min". */
+internal fun formatMinutes(duration: Duration): String {
+    val minutes = duration.inWholeMinutes
+    return when {
+        minutes < 60 -> "$minutes min"
+        minutes % 60 == 0L -> "${minutes / 60} h"
+        else -> "${minutes / 60} h ${minutes % 60} min"
+    }
+}

@@ -5,6 +5,7 @@ import io.disruption.focal.ui.blocklists.BlockListsViewModel
 import io.disruption.focal.ui.countdown.ExitCountdownViewModel
 import io.disruption.focal.ui.edit.EditSessionViewModel
 import io.disruption.focal.ui.home.HomeViewModel
+import io.disruption.focal.ui.stats.StatsViewModel
 import io.disruption.focal.ui.schedules.ScheduleEditorViewModel
 import io.disruption.focal.ui.schedules.SchedulesViewModel
 import io.disruption.focal.ui.start.StartSessionViewModel
@@ -21,5 +22,6 @@ val uiModule: Module = module {
     viewModel { (id: String) -> EditSessionViewModel(id, get(), get(), get()) }
     viewModel { StartSessionViewModel(get(), get(), get(), get()) }
     viewModel { SchedulesViewModel(get()) }
+    viewModel { StatsViewModel(get(), get(), get()) }
     viewModel { (id: String) -> ScheduleEditorViewModel(id.ifEmpty { null }, get(), get()) }
 }
