@@ -19,7 +19,7 @@ The screen shown in place of a blocked app or website. It names the Focus Sessio
 _Avoid_: Overlay, block screen, lock screen
 
 **Suggested Website**:
-A domain from Focal's own curated list of popular distracting services, offered for adding to a Block List alongside the user's typed domains.
+A domain from Focal's own curated list of popular distracting services, offered for adding to a Block List alongside the user's typed domains. A service counts as picked when all its domains are on the list; unpicking it removes all of them, including any the user also typed.
 _Avoid_: Preset, recommended site
 
 ### Sessions

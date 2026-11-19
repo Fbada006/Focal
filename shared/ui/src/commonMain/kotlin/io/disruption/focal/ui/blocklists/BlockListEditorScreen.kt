@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
@@ -190,6 +191,16 @@ private fun WebsitesTab(state: BlockListEditorState, onIntent: (BlockListEditorI
                 HorizontalDivider()
             }
             item { SectionTitle("Suggested") }
+            item {
+                // A suggestion is ticked when all its domains are blocked; unticking removes all of
+                // them, including any typed by hand above (decided for T25).
+                Text(
+                    "Unticking a service removes all its domains, including ones you typed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             items(state.suggestions, key = { "suggested-${it.id}" }) { suggestion ->
                 ListItem(
                     headlineContent = { Text(suggestion.name) },

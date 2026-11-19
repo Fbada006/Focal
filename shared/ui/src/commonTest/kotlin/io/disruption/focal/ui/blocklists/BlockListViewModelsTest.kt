@@ -149,4 +149,16 @@ class SuggestedWebsitesTest : MainDispatcherTest() {
         vm.onIntent(BlockListEditorIntent.SuggestionToggled("youtube"))
         assertEquals(emptyList(), vm.state.value.domains)
     }
+
+    @Test
+    fun untickingASuggestionRemovesAllItsDomainsIncludingTypedOnes() = runTest {
+        val vm = BlockListEditorViewModel("social", f.blockLists, FakeSuggestedWebsites)
+        vm.onIntent(BlockListEditorIntent.DomainInputChanged("youtube.com"))
+        vm.onIntent(BlockListEditorIntent.DomainSubmitted)
+        vm.onIntent(BlockListEditorIntent.SuggestionToggled("youtube"))
+
+        vm.onIntent(BlockListEditorIntent.SuggestionToggled("youtube"))
+
+        assertEquals(emptyList(), vm.state.value.domains)
+    }
 }
