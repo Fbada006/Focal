@@ -1,6 +1,8 @@
 package io.disruption.focal.core.session
 
 import io.disruption.focal.core.blocking.BlockingEngine
+import io.disruption.focal.core.ios.ExtensionEvent
+import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
@@ -99,6 +101,63 @@ class FocusSessionService(
         val running = sessions.getRunning()
         running.forEach { engine.apply(it) }
         running
+    }
+
+    /**
+     * Apply what the iOS extensions recorded while Focal wasn't running (ADR 0008): sessions they
+     * started for Schedules and sessions whose window they ended. Ingesting the same events again
+     * changes nothing. Call [restore] afterwards to bring blocking and outcomes up to date.
+     */
+    suspend fun ingest(events: List<ExtensionEvent>): IngestReport = mutex.withLock {
+        var started = 0
+        var ended = 0
+        var breaksEnded = 0
+        for (event in events.sortedBy { it.at }) {
+            when (event) {
+                is ExtensionEvent.ScheduleSessionStarted -> {
+                    val id = FocusSessionId(event.sessionId)
+                    if (sessions.get(id) != null) continue
+                    sessions.save(
+                        FocusSession(
+                            id = id,
+                            blockListId = BlockListId(event.blockListId),
+                            name = event.name,
+                            // An unreadable Strictness must never make a session weaker than it was.
+                            strictness = Strictness.entries.firstOrNull { it.name == event.strictness } ?: Strictness.Locked,
+                            startedAt = event.at,
+                            plannedEnd = event.plannedEnd,
+                            // The extension's copy, not the list as it is now (ADR 0007).
+                            blocked = BlockedSet(
+                                apps = event.apps.toSet(),
+                                appCategories = event.appCategories.toSet(),
+                                domains = event.domains.toSet(),
+                            ),
+                            scheduleId = ScheduleId(event.scheduleId),
+                        ),
+                    )
+                    started++
+                }
+                is ExtensionEvent.ScheduleSessionEnded -> {
+                    val session = sessions.get(FocusSessionId(event.sessionId))?.takeIf { it.isRunning } ?: continue
+                    if (event.at < session.plannedEnd) continue // only the window's end completes a session
+                    finish(session, Outcome.Completed, session.plannedEnd)
+                    ended++
+                }
+                // Breaks never change the outcome or the end time. Blocking came back at event.at, so
+                // a Break recorded as running past that is cut short to match.
+                is ExtensionEvent.BreakEnded -> {
+                    val session = sessions.get(FocusSessionId(event.sessionId))?.takeIf { it.isRunning } ?: continue
+                    val breaks = session.breaks.map { b ->
+                        if (event.at > b.startedAt && event.at < b.endsAt) b.copy(endsAt = event.at) else b
+                    }
+                    if (breaks != session.breaks) {
+                        sessions.save(session.copy(breaks = breaks))
+                        breaksEnded++
+                    }
+                }
+            }
+        }
+        IngestReport(sessionsStarted = started, sessionsCompleted = ended, breaksEnded = breaksEnded)
     }
 
     private suspend fun completeDueLocked(): List<FocusSession> {

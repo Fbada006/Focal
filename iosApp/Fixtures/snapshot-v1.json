@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "generatedAt": "2026-01-05T09:10:00Z",
+  "blockLists": [
+    {
+      "id": "bl-social",
+      "name": "Social",
+      "apps": [
+        "app-token-instagram",
+        "app-token-tiktok"
+      ],
+      "appCategories": [
+        "cat-token-social"
+      ],
+      "domains": [
+        "reddit.com",
+        "x.com"
+      ]
+    }
+  ],
+  "schedules": [
+    {
+      "id": "sch-wind-down",
+      "name": "Wind down",
+      "days": [
+        "SUNDAY"
+      ],
+      "start": "22:00",
+      "end": "07:00",
+      "blockListId": "bl-social",
+      "strictness": "Locked"
+    },
+    {
+      "id": "sch-work",
+      "name": "Work hours",
+      "days": [
+        "MONDAY",
+        "FRIDAY"
+      ],
+      "start": "09:00",
+      "end": "17:30",
+      "blockListId": "bl-social",
+      "strictness": "Delayed"
+    }
+  ],
+  "runningSessions": [
+    {
+      "id": "fs-1",
+      "name": "Work hours",
+      "strictness": "Delayed",
+      "startedAt": "2026-01-05T09:00:00Z",
+      "plannedEnd": "2026-01-05T17:30:00Z",
+      "apps": [
+        "app-token-instagram",
+        "app-token-tiktok"
+      ],
+      "appCategories": [
+        "cat-token-social"
+      ],
+      "domains": [
+        "reddit.com",
+        "x.com"
+      ],
+      "breakEndsAt": "2026-01-05T09:13:00Z"
+    }
+  ]
+}
