@@ -54,14 +54,11 @@ class AppPickerViewModel(
     private val installed = MutableStateFlow<List<InstalledApp>?>(null)
     private val query = MutableStateFlow("")
     private val notice = MutableStateFlow<String?>(null)
-    private var selectedCategories: Set<String> = emptySet()
-
     init {
         viewModelScope.launch { installed.value = installedApps.launchableApps() }
         viewModelScope.launch {
             val blocked = blockLists.observeAll().mapNotNull { lists -> lists.firstOrNull { it.id == id }?.blocked }
             combine(installed, query, blocked, notice) { apps, query, blocked, notice ->
-                selectedCategories = blocked.appCategories
                 AppPickerState(
                     loading = apps == null,
                     query = query,
@@ -85,8 +82,8 @@ class AppPickerViewModel(
         when (intent) {
             is AppPickerIntent.QueryChanged -> query.value = intent.query
             is AppPickerIntent.CategoryToggled -> viewModelScope.launch {
-                val key = intent.key
-                blockLists.setAppCategories(id, if (key in selectedCategories) selectedCategories - key else selectedCategories + key)
+                val saved = blockLists.toggleAppCategory(id, intent.key) as? BlockListResult.Saved ?: return@launch
+                showDeferred(saved.removalsDeferredFor)
             }
             is AppPickerIntent.Toggled -> viewModelScope.launch {
                 val pkg = intent.packageName

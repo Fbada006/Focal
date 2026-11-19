@@ -122,6 +122,13 @@ class BlockListService(
     suspend fun setApps(id: BlockListId, apps: Set<String>): BlockListResult =
         update(id) { it.copy(blocked = it.blocked.copy(apps = apps)) }
 
+    /** Pick or unpick one App Category, reading the stored list under the edit lock (see [toggleApp]). */
+    suspend fun toggleAppCategory(id: BlockListId, key: String): BlockListResult =
+        update(id) {
+            val categories = it.blocked.appCategories
+            it.copy(blocked = it.blocked.copy(appCategories = if (key in categories) categories - key else categories + key))
+        }
+
     /** Replace the list's App Categories. */
     suspend fun setAppCategories(id: BlockListId, categories: Set<String>): BlockListResult =
         update(id) { it.copy(blocked = it.blocked.copy(appCategories = categories)) }

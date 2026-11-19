@@ -60,6 +60,17 @@ class AppPickerViewModelTest : MainDispatcherTest() {
 
         assertNotNull(vm.state.value.notice)
     }
+
+    @Test
+    fun unpickingACategoryARunningDelayedSessionUsesSaysTheRemovalIsDeferred() = runTest {
+        val vm = vm()
+        vm.onIntent(AppPickerIntent.CategoryToggled("games"))
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Delayed)
+
+        vm.onIntent(AppPickerIntent.CategoryToggled("games"))
+
+        assertNotNull(vm.state.value.notice)
+    }
 }
 
 class AppPickerSuggestionsTest : MainDispatcherTest() {
