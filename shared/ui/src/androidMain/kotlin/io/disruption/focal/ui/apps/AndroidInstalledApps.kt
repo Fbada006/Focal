@@ -2,11 +2,11 @@ package io.disruption.focal.ui.apps
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import io.disruption.focal.core.apps.InstalledApp
 import io.disruption.focal.core.apps.InstalledAppsSource
+import io.disruption.focal.data.apps.AndroidAppCategories
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -33,23 +33,8 @@ class AndroidInstalledApps(private val context: Context) : InstalledAppsSource {
                 InstalledApp(
                     packageName = info.packageName,
                     label = pm.getApplicationLabel(info).toString(),
-                    systemCategory = systemCategoryKey(info),
+                    systemCategory = AndroidAppCategories.systemCategoryKey(info),
                 )
             }
-    }
-
-    companion object {
-        /** Android's own category as an [io.disruption.focal.core.apps.AppCategory] key, if it maps to one. */
-        fun systemCategoryKey(info: ApplicationInfo): String? {
-            if (Build.VERSION.SDK_INT < 26) return null
-            return when (info.category) {
-                ApplicationInfo.CATEGORY_GAME -> "games"
-                ApplicationInfo.CATEGORY_AUDIO -> "music"
-                ApplicationInfo.CATEGORY_VIDEO -> "video"
-                ApplicationInfo.CATEGORY_SOCIAL -> "social"
-                ApplicationInfo.CATEGORY_NEWS -> "news"
-                else -> null
-            }
-        }
     }
 }

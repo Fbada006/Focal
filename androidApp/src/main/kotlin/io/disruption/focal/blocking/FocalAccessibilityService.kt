@@ -1,0 +1,79 @@
+package io.disruption.focal.blocking
+
+import android.accessibilityservice.AccessibilityService
+import android.content.Intent
+import android.view.accessibility.AccessibilityEvent
+import io.disruption.focal.MainActivity
+import io.disruption.focal.core.blocking.BlockingEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import org.koin.core.context.GlobalContext
+
+/**
+ * Detects the foreground app and shows the Shield for anything blocked by a running Focus Session
+ * (T13, docs/android-blocking-engine.md). Android binds this service itself, so it survives better
+ * than a normal service; it makes no domain decisions, it asks [AndroidBlockingEngine].
+ */
+class FocalAccessibilityService : AccessibilityService() {
+    private var engine: AndroidBlockingEngine? = null
+    private var overlay: ShieldOverlay? = null
+    private var scope: CoroutineScope? = null
+    private lateinit var noise: NoisePackages
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        val engine = runCatching {
+            GlobalContext.get().get<BlockingEngine>() as AndroidBlockingEngine
+        }.getOrNull() ?: return
+        this.engine = engine
+        noise = NoisePackages(this)
+
+        val overlay = ShieldOverlay(
+            service = this,
+            onClose = {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                engine.onForeground(null)
+            },
+            onOpenFocal = {
+                startActivity(
+                    Intent(this, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                )
+                engine.onForeground(null)
+            },
+        )
+        overlay.attach()
+        this.overlay = overlay
+
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        engine.shield.onEach(overlay::render).launchIn(scope)
+        this.scope = scope
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val packageName = event.packageName?.toString() ?: return
+        val engine = engine ?: return
+        // Leaving the app (launcher, System UI, keyboard) or returning to Focal lifts the Shield.
+        if (packageName in noise) {
+            engine.onForeground(null)
+            return
+        }
+        engine.onForeground(packageName)
+    }
+
+    override fun onInterrupt() {
+        engine?.onForeground(null)
+    }
+
+    override fun onDestroy() {
+        scope?.cancel()
+        overlay?.detach()
+        engine?.onForeground(null)
+        super.onDestroy()
+    }
+}

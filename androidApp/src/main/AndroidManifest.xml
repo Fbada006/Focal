@@ -4,6 +4,13 @@
     <!-- The running-session notification and the Shield's Open Focal (story 4). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Keeps Focal alive and shows the running-session timer while a session runs (T13). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Running Focus Sessions are re-applied after a reboot (T13). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- Lets Focal list launchable apps without QUERY_ALL_PACKAGES (T12). -->
     <queries>
         <intent>
@@ -29,6 +36,39 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Detects the foreground app and draws the Shield (T13). -->
+        <service
+            android:name="io.disruption.focal.blocking.FocalAccessibilityService"
+            android:exported="false"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/focal_accessibility_service" />
+        </service>
+
+        <!-- Keeps blocking alive and shows the timer while any Focus Session runs (T13). -->
+        <service
+            android:name=".blocking.RunningSessionService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Blocks distracting apps during a user-started Focus Session and keeps its remaining time visible." />
+        </service>
+
+        <receiver
+            android:name=".blocking.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
