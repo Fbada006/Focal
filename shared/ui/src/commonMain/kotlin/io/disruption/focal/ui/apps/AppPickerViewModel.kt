@@ -35,14 +35,12 @@ class AppPickerViewModel(
     private val id = BlockListId(blockListId)
     private val installed = MutableStateFlow<List<InstalledApp>?>(null)
     private val query = MutableStateFlow("")
-    private var selected: Set<String> = emptySet()
 
     init {
         viewModelScope.launch { installed.value = installedApps.launchableApps() }
         viewModelScope.launch {
             val selection = blockLists.observeAll().mapNotNull { lists -> lists.firstOrNull { it.id == id }?.blocked?.apps }
             combine(installed, query, selection) { apps, query, selection ->
-                selected = selection
                 AppPickerState(
                     loading = apps == null,
                     query = query,
@@ -56,10 +54,7 @@ class AppPickerViewModel(
     override fun onIntent(intent: AppPickerIntent) {
         when (intent) {
             is AppPickerIntent.QueryChanged -> query.value = intent.query
-            is AppPickerIntent.Toggled -> viewModelScope.launch {
-                val pkg = intent.packageName
-                blockLists.setApps(id, if (pkg in selected) selected - pkg else selected + pkg)
-            }
+            is AppPickerIntent.Toggled -> viewModelScope.launch { blockLists.toggleApp(id, intent.packageName) }
         }
     }
 

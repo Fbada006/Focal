@@ -90,6 +90,16 @@ class BlockListService(
     suspend fun removeDomain(id: BlockListId, hostname: String): BlockListResult =
         update(id) { it.withDomains(it.blocked.domains - hostname) }
 
+    /**
+     * Pick or unpick one app. Reads the stored list under the edit lock, so quick taps on several
+     * apps each land, instead of the last write overwriting the others.
+     */
+    suspend fun toggleApp(id: BlockListId, packageName: String): BlockListResult =
+        update(id) {
+            val apps = it.blocked.apps
+            it.copy(blocked = it.blocked.copy(apps = if (packageName in apps) apps - packageName else apps + packageName))
+        }
+
     /** Replace the list's individually picked apps. */
     suspend fun setApps(id: BlockListId, apps: Set<String>): BlockListResult =
         update(id) { it.copy(blocked = it.blocked.copy(apps = apps)) }
