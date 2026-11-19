@@ -16,7 +16,11 @@ import io.disruption.focal.ui.navigation.BlockLists
 import io.disruption.focal.ui.navigation.EditSession
 import io.disruption.focal.ui.navigation.ExitCountdown
 import io.disruption.focal.ui.navigation.Home
+import io.disruption.focal.ui.navigation.ScheduleEditor
+import io.disruption.focal.ui.navigation.Schedules
 import io.disruption.focal.ui.navigation.StartSession
+import io.disruption.focal.ui.schedules.ScheduleEditorRoute
+import io.disruption.focal.ui.schedules.SchedulesRoute
 import io.disruption.focal.ui.start.StartSessionRoute
 import io.disruption.focal.ui.theme.FocalTheme
 
@@ -36,7 +40,14 @@ fun App(platform: PlatformContent = PlatformContent()) {
                     onOpenBlockLists = { nav.navigate(BlockLists) },
                     onOpenExitCountdown = { nav.navigate(ExitCountdown(it)) },
                     onOpenEditSession = { nav.navigate(EditSession(it)) },
+                    onOpenSchedules = { nav.navigate(Schedules) },
                 )
+            }
+            composable<Schedules> {
+                SchedulesRoute(onOpenEditor = { nav.navigate(ScheduleEditor(it)) }, onBack = { nav.popBackStack() })
+            }
+            composable<ScheduleEditor> { entry ->
+                ScheduleEditorRoute(entry.toRoute<ScheduleEditor>().id, onClose = { nav.popBackStack() })
             }
             composable<EditSession> { entry ->
                 EditSessionRoute(entry.toRoute<EditSession>().sessionId, onClose = { nav.popBackStack() })

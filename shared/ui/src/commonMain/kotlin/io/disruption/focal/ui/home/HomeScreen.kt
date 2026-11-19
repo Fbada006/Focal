@@ -34,6 +34,7 @@ fun HomeRoute(
     onOpenBlockLists: () -> Unit,
     onOpenExitCountdown: (sessionId: String) -> Unit,
     onOpenEditSession: (sessionId: String) -> Unit,
+    onOpenSchedules: () -> Unit,
     sessionActions: @Composable (RunningSessionRow) -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
 ) {
@@ -42,6 +43,7 @@ fun HomeRoute(
         when (effect) {
             HomeEffect.OpenStart -> onOpenStart()
             HomeEffect.OpenBlockLists -> onOpenBlockLists()
+            HomeEffect.OpenSchedules -> onOpenSchedules()
             is HomeEffect.OpenExitCountdown -> onOpenExitCountdown(effect.sessionId)
             is HomeEffect.OpenEditSession -> onOpenEditSession(effect.sessionId)
         }
@@ -63,7 +65,10 @@ fun HomeScreen(
         topBar = {
             FocalTopBar(
                 title = "Focal",
-                actions = { TextButton(onClick = { onIntent(HomeIntent.BlockListsClicked) }) { Text("Block Lists") } },
+                actions = {
+                    TextButton(onClick = { onIntent(HomeIntent.SchedulesClicked) }) { Text("Schedules") }
+                    TextButton(onClick = { onIntent(HomeIntent.BlockListsClicked) }) { Text("Block Lists") }
+                },
             )
         },
     ) { padding ->

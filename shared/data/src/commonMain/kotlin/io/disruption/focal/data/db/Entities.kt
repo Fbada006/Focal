@@ -40,3 +40,17 @@ data class FocusSessionEntity(
 
 @Serializable
 data class BreakRecord(val startedAt: Long, val endsAt: Long)
+
+@Entity(tableName = "schedules")
+data class ScheduleEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    /** `MONDAY` … `SUNDAY`. */
+    val days: Set<String>,
+    /** Local `HH:mm`. */
+    val start: String,
+    val end: String,
+    val blockListId: String,
+    val strictness: String,
+    val enabled: Boolean,
+)

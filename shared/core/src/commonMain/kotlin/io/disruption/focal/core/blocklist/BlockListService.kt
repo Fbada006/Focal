@@ -5,6 +5,7 @@ import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
+import io.disruption.focal.core.repository.ScheduleRepository
 import io.disruption.focal.core.session.BlockListChangeReport
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.core.session.SessionLock
@@ -30,6 +31,8 @@ class BlockListService(
     private val sessionService: FocusSessionService,
     private val newId: () -> String = { Uuid.random().toString() },
     private val lock: SessionLock = SessionLock(),
+    /** Schedules that would start sessions on a list; deleting a list they use is refused. */
+    private val schedules: ScheduleRepository? = null,
 ) {
     /** Serialises read-modify-write edits, so two quick edits can't overwrite each other. */
     private val edits = Mutex()
@@ -60,6 +63,8 @@ class BlockListService(
             blockLists.get(id) ?: return DeleteResult.NotFound
             val users = sessions.getRunning().filter { it.blockListId == id }
             if (users.isNotEmpty()) return DeleteResult.InUse(users.map { it.name })
+            val scheduled = schedules?.getAll().orEmpty().filter { it.blockListId == id }
+            if (scheduled.isNotEmpty()) return DeleteResult.UsedBySchedules(scheduled.map { it.name })
             blockLists.delete(id)
             DeleteResult.Deleted
         }
@@ -159,6 +164,9 @@ sealed interface DeleteResult {
 
     /** Names of the running Focus Sessions using the list. */
     data class InUse(val sessionNames: List<String>) : DeleteResult
+
+    /** Names of the Schedules that start sessions on the list; it would leave them with nothing. */
+    data class UsedBySchedules(val scheduleNames: List<String>) : DeleteResult
 }
 
 sealed interface DomainEditResult {

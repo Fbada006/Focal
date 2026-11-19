@@ -4,11 +4,14 @@ import io.disruption.focal.core.model.BlockList
 import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
+import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
+import io.disruption.focal.core.repository.ScheduleRepository
 import io.disruption.focal.data.db.BlockListDao
 import io.disruption.focal.data.db.FocusSessionDao
+import io.disruption.focal.data.db.ScheduleDao
 import io.disruption.focal.data.db.toEntity
 import io.disruption.focal.data.db.toModel
 import kotlinx.coroutines.flow.Flow
@@ -30,4 +33,12 @@ class RoomFocusSessionRepository(private val dao: FocusSessionDao) : FocusSessio
         dao.getStartedBySchedule(scheduleId.value, since.toEpochMilliseconds()).map { it.toModel() }
     override suspend fun get(id: FocusSessionId): FocusSession? = dao.get(id.value)?.toModel()
     override suspend fun save(session: FocusSession) = dao.upsert(session.toEntity())
+}
+
+class RoomScheduleRepository(private val dao: ScheduleDao) : ScheduleRepository {
+    override fun observeAll(): Flow<List<Schedule>> = dao.observeAll().map { rows -> rows.map { it.toModel() } }
+    override suspend fun getAll(): List<Schedule> = dao.getAll().map { it.toModel() }
+    override suspend fun get(id: ScheduleId): Schedule? = dao.get(id.value)?.toModel()
+    override suspend fun save(schedule: Schedule) = dao.upsert(schedule.toEntity())
+    override suspend fun delete(id: ScheduleId) = dao.delete(id.value)
 }

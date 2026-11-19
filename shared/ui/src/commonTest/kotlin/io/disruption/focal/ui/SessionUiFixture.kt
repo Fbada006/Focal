@@ -4,11 +4,13 @@ import io.disruption.focal.core.blocklist.BlockListService
 import io.disruption.focal.core.model.BlockList
 import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.BlockedSet
+import io.disruption.focal.core.schedule.ScheduleService
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.core.time.TimeZoneProvider
 import io.disruption.focal.testing.FakeClock
 import io.disruption.focal.testing.InMemoryBlockListRepository
 import io.disruption.focal.testing.InMemoryFocusSessionRepository
+import io.disruption.focal.testing.InMemoryScheduleRepository
 import io.disruption.focal.testing.RecordingBlockingEngine
 import kotlinx.datetime.TimeZone
 
@@ -24,5 +26,7 @@ class SessionUiFixture(vararg lists: BlockList = arrayOf(social, empty)) {
     val engine = RecordingBlockingEngine()
     private var ids = 0
     val sessions = FocusSessionService(blockListRepository, sessionRepository, engine, clock, newId = { "s${++ids}" })
-    val blockLists = BlockListService(blockListRepository, sessionRepository, sessions)
+    val scheduleRepository = InMemoryScheduleRepository()
+    val blockLists = BlockListService(blockListRepository, sessionRepository, sessions, schedules = scheduleRepository)
+    val schedules = ScheduleService(scheduleRepository, blockListRepository, sessions, zone, newId = { "sch" })
 }

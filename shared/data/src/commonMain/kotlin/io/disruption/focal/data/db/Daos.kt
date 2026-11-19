@@ -40,3 +40,21 @@ interface FocusSessionDao {
     @Upsert
     suspend fun upsert(entity: FocusSessionEntity)
 }
+
+@Dao
+interface ScheduleDao {
+    @Query("SELECT * FROM schedules ORDER BY name COLLATE NOCASE")
+    fun observeAll(): Flow<List<ScheduleEntity>>
+
+    @Query("SELECT * FROM schedules ORDER BY name COLLATE NOCASE")
+    suspend fun getAll(): List<ScheduleEntity>
+
+    @Query("SELECT * FROM schedules WHERE id = :id")
+    suspend fun get(id: String): ScheduleEntity?
+
+    @Upsert
+    suspend fun upsert(entity: ScheduleEntity)
+
+    @Query("DELETE FROM schedules WHERE id = :id")
+    suspend fun delete(id: String)
+}
