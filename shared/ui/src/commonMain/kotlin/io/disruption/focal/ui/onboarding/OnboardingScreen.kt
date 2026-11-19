@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.disruption.focal.ui.help.BatteryHelpContent
 import io.disruption.focal.ui.mvi.CollectEffects
 import io.disruption.focal.ui.permissions.OnResume
 import io.disruption.focal.ui.permissions.copy
@@ -75,6 +76,16 @@ fun OnboardingScreen(state: OnboardingState, onIntent: (OnboardingIntent) -> Uni
                     }
                     TextButton(onClick = { onIntent(OnboardingIntent.Next) }) { Text("Not now") }
                 }
+            }
+            OnboardingStep.BatteryHelp -> {
+                Text("Keep Focal running", style = MaterialTheme.typography.headlineSmall)
+                BatteryHelpContent(state.batteryHelp) { onIntent(OnboardingIntent.HelpLinkClicked(it)) }
+                Text(
+                    "You can find these steps later under \"Why did my session stop?\" on Home.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(onClick = { onIntent(OnboardingIntent.Next) }, modifier = Modifier.fillMaxWidth()) { Text("Continue") }
             }
             OnboardingStep.FirstBlockList -> {
                 Text("Your first Block List", style = MaterialTheme.typography.headlineSmall)

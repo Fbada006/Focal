@@ -12,7 +12,9 @@ import io.disruption.focal.ui.blocklists.BlockListEditorRoute
 import io.disruption.focal.ui.blocklists.BlockListsRoute
 import io.disruption.focal.ui.countdown.ExitCountdownRoute
 import io.disruption.focal.ui.edit.EditSessionRoute
+import io.disruption.focal.ui.help.BatteryHelpRoute
 import io.disruption.focal.ui.home.HomeRoute
+import io.disruption.focal.ui.navigation.BatteryHelp
 import io.disruption.focal.ui.navigation.BlockListEditor
 import io.disruption.focal.ui.navigation.BlockLists
 import io.disruption.focal.ui.navigation.EditSession
@@ -59,8 +61,10 @@ fun App(platform: PlatformContent = PlatformContent(), root: RootViewModel = koi
                     onOpenEditSession = { nav.navigate(EditSession(it)) },
                     onOpenSchedules = { nav.navigate(Schedules) },
                     onOpenStats = { nav.navigate(Stats) },
+                    onOpenHelp = { nav.navigate(BatteryHelp) },
                 )
             }
+            composable<BatteryHelp> { BatteryHelpRoute(onBack = { nav.popBackStack() }) }
             composable<Stats> { StatsRoute(onBack = { nav.popBackStack() }) }
             composable<Schedules> {
                 SchedulesRoute(onOpenEditor = { nav.navigate(ScheduleEditor(it)) }, onBack = { nav.popBackStack() })
