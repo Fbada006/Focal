@@ -23,5 +23,10 @@ kotlin {
             api(libs.kotlin.test)
             api(libs.kotlinx.coroutines.test)
         }
+        // kotlin-test in a main source set doesn't get the JUnit variant inferred, so on JVM
+        // `@Test` and the asserter would be missing. Name it explicitly.
+        jvmMain.dependencies {
+            api(libs.kotlin.testJunit)
+        }
     }
 }
