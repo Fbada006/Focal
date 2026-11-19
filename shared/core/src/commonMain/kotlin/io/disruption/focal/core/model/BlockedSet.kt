@@ -1,11 +1,13 @@
 package io.disruption.focal.core.model
 
+import io.disruption.focal.core.website.Domains
+
 /**
  * What a Block List, or a running Focus Session's own copy of it, blocks.
  *
  * App and App Category identifiers are opaque to the domain: package names and category keys on
  * Android, serialised Screen Time tokens on iOS. Domains are normalised hostnames (see
- * `Domain.normalise`); a hostname also blocks its subdomains.
+ * [Domains.normalise]); a hostname also blocks its subdomains.
  */
 data class BlockedSet(
     val apps: Set<String> = emptySet(),
@@ -25,6 +27,9 @@ data class BlockedSet(
         appCategories = appCategories - other.appCategories,
         domains = domains - other.domains,
     )
+
+    /** Whether visiting [host] (a hostname or URL) is blocked by one of [domains]. */
+    fun blocksWebsite(host: String): Boolean = Domains.anyMatches(domains, host)
 
     /** True when everything in [other] is also blocked by this set. */
     fun containsAll(other: BlockedSet): Boolean =
