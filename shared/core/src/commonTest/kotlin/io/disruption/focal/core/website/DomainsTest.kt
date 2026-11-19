@@ -24,6 +24,9 @@ class DomainsTest {
             "www.bbc.co.uk" to "bbc.co.uk",
             "app.www.example.com" to "app.www.example.com",
             "x-y.example" to "x-y.example",
+            "youtube.com/watch?v=1&u=https://a.example" to "youtube.com",
+            "google.com/url?q=https://youtube.com" to "google.com",
+            "xn--bcher-kva.de" to "xn--bcher-kva.de",
         )
         for ((input, expected) in cases) {
             assertEquals(NormalisedDomain.Valid(expected), Domains.normalise(input), "input: $input")
@@ -39,6 +42,7 @@ class DomainsTest {
             "youtube" to InvalidDomainReason.NoDot,
             "you tube.com" to InvalidDomainReason.BadCharacter,
             "you_tube.com" to InvalidDomainReason.BadCharacter,
+            "bücher.de" to InvalidDomainReason.BadCharacter,
             "youtube..com" to InvalidDomainReason.BadLabel,
             ".youtube.com" to InvalidDomainReason.BadLabel,
             "-youtube.com" to InvalidDomainReason.BadLabel,
@@ -72,6 +76,8 @@ class DomainsTest {
             Triple("docs.google.com", "mail.google.com", false),
             Triple("docs.google.com", "google.com", false),
             Triple("youtube.com", "not a url", false),
+            Triple("youtube.com", "google.com/url?q=https://youtube.com", false),
+            Triple("youtube.com", "youtube.com/watch?u=https://a.example", true),
         )
         for ((blocked, visited, expected) in cases) {
             assertEquals(expected, Domains.matches(blocked, visited), "$blocked vs $visited")

@@ -11,12 +11,15 @@ object Domains {
     private const val MAX_LENGTH = 253
     private const val MAX_LABEL_LENGTH = 63
 
+    /** A scheme only counts at the very start; `://` inside a query (`?u=https://…`) is not one. */
+    private val LEADING_SCHEME = Regex("^[a-z][a-z0-9+.-]*://")
+
     /** Turn typed input, such as a pasted URL, into the hostname to block, or explain why not. */
     fun normalise(input: String): NormalisedDomain {
         var host = input.trim().lowercase()
         if (host.isEmpty()) return NormalisedDomain.Invalid(InvalidDomainReason.Empty)
 
-        host = host.substringAfter("://", host)
+        host = host.replace(LEADING_SCHEME, "")
         host = host.takeWhile { it != '/' && it != '?' && it != '#' }
         host = host.substringAfterLast('@')
         host = host.substringBefore(':')
@@ -54,7 +57,9 @@ object Domains {
         for (label in labels) {
             if (label.isEmpty() || label.length > MAX_LABEL_LENGTH) return InvalidDomainReason.BadLabel
             if (label.startsWith('-') || label.endsWith('-')) return InvalidDomainReason.BadLabel
-            if (!label.all { it.isLetterOrDigit() || it == '-' }) return InvalidDomainReason.BadCharacter
+            // ASCII only: browsers show internationalised names in punycode (`xn--…`), so a Unicode
+            // form typed here would never match what the address bar shows.
+            if (!label.all { it in 'a'..'z' || it in '0'..'9' || it == '-' }) return InvalidDomainReason.BadCharacter
         }
         return null
     }
