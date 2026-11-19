@@ -29,3 +29,6 @@ data class ScheduleEditor(val id: String? = null)
 
 @Serializable
 data object Stats
+
+@Serializable
+data object Onboarding

@@ -2,6 +2,7 @@ package io.disruption.focal
 
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.ios.ingestOnLaunch
+import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.session.FocusSessionService
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.MainScope
@@ -21,11 +22,15 @@ const val APP_GROUP_ID = "group.io.disruption.focal"
 const val EXTENSION_EVENTS_FILE = "extension-events.json"
 
 /**
- * Entry point for Swift: `StartFocalKt.startFocal(blockingEngine: …)` from `iOSApp.init`. Starts
- * Koin, then ingests what the extensions did while Focal wasn't running.
+ * Entry point for Swift: `StartFocalKt.startFocal(blockingEngine: …, permissionGateway: …)` from
+ * `iOSApp.init`. The Swift side supplies the Screen Time engine (T16) and permissions (T15).
+ * Starts Koin, then ingests what the extensions did while Focal wasn't running.
  */
-fun startFocal(blockingEngine: BlockingEngine = PendingBlockingEngine()) {
-    val koin = initKoin(blockingEngine).koin
+fun startFocal(
+    blockingEngine: BlockingEngine = PendingBlockingEngine(),
+    permissionGateway: PermissionGateway = PendingPermissionGateway(),
+) {
+    val koin = initKoin(blockingEngine, permissionGateway).koin
     MainScope().launch { ingestOnLaunch(koin.get<FocusSessionService>(), readExtensionEvents()) }
 }
 

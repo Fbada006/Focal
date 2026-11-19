@@ -38,6 +38,8 @@ import io.disruption.focal.ui.home.description
 import io.disruption.focal.ui.home.formatMinutes
 import io.disruption.focal.ui.home.label
 import io.disruption.focal.ui.mvi.CollectEffects
+import io.disruption.focal.ui.permissions.OnResume
+import io.disruption.focal.ui.permissions.PermissionBanner
 import kotlinx.datetime.LocalTime
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Duration
@@ -57,6 +59,7 @@ fun StartSessionRoute(
             StartSessionEffect.OpenBlockLists -> onOpenBlockLists()
         }
     }
+    OnResume { viewModel.onIntent(StartSessionIntent.Resumed) }
     StartSessionScreen(state, viewModel::onIntent, onBack)
 }
 
@@ -66,6 +69,13 @@ fun StartSessionScreen(state: StartSessionState, onIntent: (StartSessionIntent) 
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
         ) {
+            state.missingPermissions.forEach { permission ->
+                PermissionBanner(
+                    permission = permission,
+                    onFix = { onIntent(StartSessionIntent.FixPermissionClicked(permission)) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             SectionTitle("Block List")
             if (!state.loading && state.blockLists.isEmpty()) {
                 TextButton(

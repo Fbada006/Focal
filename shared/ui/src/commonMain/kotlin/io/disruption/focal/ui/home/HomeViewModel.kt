@@ -4,6 +4,8 @@ import androidx.lifecycle.viewModelScope
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
+import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.ui.mvi.MviViewModel
 import kotlinx.coroutines.delay
@@ -34,7 +36,13 @@ data class RunningSessionRow(
 data class HomeState(
     val loading: Boolean = true,
     val running: List<RunningSessionRow> = emptyList(),
-)
+    /** Required permissions that are missing; starting a session is disabled until fixed. */
+    val missingPermissions: List<Permission> = emptyList(),
+    /** Until the first check returns, Start stays disabled rather than briefly looking available. */
+    val permissionsChecked: Boolean = false,
+) {
+    val canStart: Boolean get() = permissionsChecked && missingPermissions.isEmpty()
+}
 
 sealed interface HomeIntent {
     data object StartClicked : HomeIntent
@@ -44,6 +52,10 @@ sealed interface HomeIntent {
     data class EndClicked(val sessionId: String) : HomeIntent
     data class TakeBreakClicked(val sessionId: String) : HomeIntent
     data class EditClicked(val sessionId: String) : HomeIntent
+    data class FixPermissionClicked(val permission: Permission) : HomeIntent
+
+    /** Focal came back to the foreground; permissions may have changed. */
+    data object Resumed : HomeIntent
 }
 
 sealed interface HomeEffect {
@@ -58,10 +70,12 @@ sealed interface HomeEffect {
 class HomeViewModel(
     private val sessions: FocusSessionService,
     private val clock: Clock,
+    private val permissions: PermissionGateway,
     ticks: Flow<Unit> = everySecond(),
 ) : MviViewModel<HomeState, HomeIntent, HomeEffect>(HomeState()) {
 
     init {
+        refreshPermissions()
         viewModelScope.launch {
             combine(sessions.running, ticks.onStart { emit(Unit) }) { running, _ -> running }
                 .collect { running -> render(running) }
@@ -70,7 +84,9 @@ class HomeViewModel(
 
     override fun onIntent(intent: HomeIntent) {
         when (intent) {
-            HomeIntent.StartClicked -> emit(HomeEffect.OpenStart)
+            HomeIntent.StartClicked -> if (currentState.canStart) emit(HomeEffect.OpenStart)
+            HomeIntent.Resumed -> refreshPermissions()
+            is HomeIntent.FixPermissionClicked -> permissions.request(intent.permission)
             HomeIntent.BlockListsClicked -> emit(HomeEffect.OpenBlockLists)
             HomeIntent.SchedulesClicked -> emit(HomeEffect.OpenSchedules)
             HomeIntent.StatsClicked -> emit(HomeEffect.OpenStats)
@@ -79,6 +95,13 @@ class HomeViewModel(
             is HomeIntent.TakeBreakClicked -> viewModelScope.launch {
                 sessions.takeBreak(FocusSessionId(intent.sessionId))
             }
+        }
+    }
+
+    private fun refreshPermissions() {
+        viewModelScope.launch {
+            val missing = permissions.missing()
+            setState { copy(missingPermissions = missing, permissionsChecked = true) }
         }
     }
 

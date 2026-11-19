@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- The running-session notification and the Shield's Open Focal (story 4). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Lets Focal list launchable apps without QUERY_ALL_PACKAGES (T12). -->
     <queries>
         <intent>

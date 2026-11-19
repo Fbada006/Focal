@@ -25,7 +25,7 @@ class HomeViewModelTest : MainDispatcherTest() {
     fun showsEachRunningSessionWithItsStrictnessAndTimeLeft() = runTest {
         f.sessions.start(social.id, SessionLength.For(25.minutes), Strictness.Normal)
         f.sessions.start(social.id, SessionLength.For(90.minutes), Strictness.Locked)
-        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
 
         val rows = vm.state.value.running
         assertEquals(listOf("25 min 00 s left", "1 h 30 min left"), rows.map { it.timeLeft })
@@ -36,7 +36,7 @@ class HomeViewModelTest : MainDispatcherTest() {
     @Test
     fun timeLeftUpdatesOnEachTick() = runTest {
         f.sessions.start(social.id, SessionLength.For(25.minutes), Strictness.Normal)
-        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
 
         f.clock.advanceBy(61.seconds)
         ticks.emit(Unit)
@@ -47,7 +47,7 @@ class HomeViewModelTest : MainDispatcherTest() {
     @Test
     fun endingANormalSessionRecordsEndedEarly() = runTest {
         f.sessions.start(social.id, SessionLength.For(25.minutes), Strictness.Normal)
-        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
 
         vm.onIntent(HomeIntent.EndClicked("s1"))
 
@@ -58,7 +58,7 @@ class HomeViewModelTest : MainDispatcherTest() {
     @Test
     fun sessionsThatRunOutMoveToCompleted() = runTest {
         f.sessions.start(social.id, SessionLength.For(25.minutes), Strictness.Delayed)
-        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
 
         f.clock.advanceBy(25.minutes)
         ticks.emit(Unit)
@@ -70,7 +70,7 @@ class HomeViewModelTest : MainDispatcherTest() {
 
     @Test
     fun startOpensTheStartScreen() = runTest {
-        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
         vm.onIntent(HomeIntent.StartClicked)
         assertEquals(HomeEffect.OpenStart, vm.effects.first())
     }
@@ -90,7 +90,7 @@ class HomeBreaksTest : MainDispatcherTest() {
     @Test
     fun delayedSessionsShowBreaksLeftAndCanTakeOne() = runTest {
         f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Delayed)
-        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
         assertEquals(3, vm.state.value.running.single().breaksLeft)
         assertTrue(vm.state.value.running.single().canTakeBreak)
 
@@ -107,7 +107,7 @@ class HomeBreaksTest : MainDispatcherTest() {
     fun breaksAreNotOfferedForNormalOrLockedSessions() = runTest {
         f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Normal)
         f.sessions.start(social.id, SessionLength.For(2.hours), Strictness.Locked)
-        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
 
         assertTrue(vm.state.value.running.none { it.canTakeBreak || it.breaksLeft != null })
     }
@@ -120,7 +120,7 @@ class HomeLockedTest : MainDispatcherTest() {
     @Test
     fun aLockedSessionOffersNoWayToEndOrPause() = runTest {
         f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Locked)
-        val vm = HomeViewModel(f.sessions, f.clock, ticks)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
         val row = vm.state.value.running.single()
         assertEquals(false, row.canEnd)
         assertEquals(false, row.canTakeBreak)

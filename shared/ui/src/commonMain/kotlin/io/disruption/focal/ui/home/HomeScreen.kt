@@ -26,6 +26,8 @@ import io.disruption.focal.ui.components.EmptyMessage
 import io.disruption.focal.ui.components.FocalTopBar
 import io.disruption.focal.ui.components.SectionTitle
 import io.disruption.focal.ui.mvi.CollectEffects
+import io.disruption.focal.ui.permissions.OnResume
+import io.disruption.focal.ui.permissions.PermissionBanner
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -50,6 +52,7 @@ fun HomeRoute(
             is HomeEffect.OpenEditSession -> onOpenEditSession(effect.sessionId)
         }
     }
+    OnResume { viewModel.onIntent(HomeIntent.Resumed) }
     HomeScreen(state, viewModel::onIntent, sessionActions)
 }
 
@@ -76,8 +79,16 @@ fun HomeScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            state.missingPermissions.forEach { permission ->
+                PermissionBanner(
+                    permission = permission,
+                    onFix = { onIntent(HomeIntent.FixPermissionClicked(permission)) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             Button(
                 onClick = { onIntent(HomeIntent.StartClicked) },
+                enabled = state.canStart,
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
             ) { Text("Start a Focus Session") }
 

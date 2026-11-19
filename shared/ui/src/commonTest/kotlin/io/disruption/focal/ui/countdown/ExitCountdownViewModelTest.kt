@@ -41,7 +41,7 @@ class ExitCountdownViewModelTest : MainDispatcherTest() {
     @Test
     fun homeSendsDelayedSessionsToTheCountdown() = runTest {
         startDelayed()
-        val home = HomeViewModel(f.sessions, f.clock, ticks)
+        val home = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
         home.onIntent(HomeIntent.EndClicked("s1"))
 
         assertEquals(HomeEffect.OpenExitCountdown("s1"), home.effects.first())
