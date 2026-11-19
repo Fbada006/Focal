@@ -36,7 +36,7 @@ fun StatsScreen(state: StatsState, onBack: () -> Unit) {
             SectionTitle("Streak")
             TileRow(Tile("Current", state.currentStreak), Tile("Longest", state.longestStreak))
             Text(
-                "A day counts when it has a Completed Focus Session of 15 minutes or more. A Broken session resets it.",
+                "A day counts when a Completed Focus Session blocked for 15 minutes or more, Breaks not counted. A Broken session resets it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp),
