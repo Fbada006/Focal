@@ -26,6 +26,8 @@ data class BlockListEditorState(
     val confirmingDelete: Boolean = false,
     /** Why the list couldn't be deleted, when a running session uses it. */
     val deleteRefusal: String? = null,
+    /** Shown after a removal that running Delayed or Locked sessions defer (ADR 0007). */
+    val notice: String? = null,
 )
 
 sealed interface BlockListEditorIntent {
@@ -42,6 +44,7 @@ sealed interface BlockListEditorIntent {
     data object DeleteConfirmed : BlockListEditorIntent
     data object DeleteDismissed : BlockListEditorIntent
     data object DeleteRefusalDismissed : BlockListEditorIntent
+    data object NoticeDismissed : BlockListEditorIntent
 }
 
 sealed interface BlockListEditorEffect {
@@ -88,7 +91,8 @@ class BlockListEditorViewModel(
             BlockListEditorIntent.CancelDomainEdit ->
                 setState { copy(editingDomain = null, domainInput = "", domainError = null) }
             is BlockListEditorIntent.RemoveDomain -> viewModelScope.launch {
-                service.removeDomain(id, intent.domain)
+                val result = service.removeDomain(id, intent.domain)
+                if (result is BlockListResult.Saved) showDeferred(result.removalsDeferredFor)
                 if (currentState.editingDomain == intent.domain) {
                     setState { copy(editingDomain = null, domainInput = "") }
                 }
@@ -97,7 +101,12 @@ class BlockListEditorViewModel(
             BlockListEditorIntent.DeleteDismissed -> setState { copy(confirmingDelete = false) }
             BlockListEditorIntent.DeleteConfirmed -> delete()
             BlockListEditorIntent.DeleteRefusalDismissed -> setState { copy(deleteRefusal = null) }
+            BlockListEditorIntent.NoticeDismissed -> setState { copy(notice = null) }
         }
+    }
+
+    private fun showDeferred(sessionNames: List<String>) {
+        if (sessionNames.isNotEmpty()) setState { copy(notice = deferredMessage(sessionNames)) }
     }
 
     private fun rename() {
@@ -120,7 +129,10 @@ class BlockListEditorViewModel(
                 service.editDomain(id, editing, state.domainInput)
             }
             when (result) {
-                is DomainEditResult.Saved -> setState { copy(domainInput = "", domainError = null, editingDomain = null) }
+                is DomainEditResult.Saved -> {
+                    setState { copy(domainInput = "", domainError = null, editingDomain = null) }
+                    showDeferred(result.removalsDeferredFor)
+                }
                 is DomainEditResult.Invalid -> setState { copy(domainError = result.reason.message()) }
                 is DomainEditResult.AlreadyBlocked -> setState { copy(domainError = "${result.hostname} is already blocked") }
                 DomainEditResult.NotFound -> Unit

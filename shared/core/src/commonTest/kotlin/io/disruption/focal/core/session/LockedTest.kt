@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 class LockedTest {
     private val f = SessionTestFixture()
@@ -18,7 +19,7 @@ class LockedTest {
 
         assertEquals(EndResult.NotAllowed(Strictness.Locked), f.service.endEarly(session.id))
         assertEquals(CountdownResult.NotAllowed(Strictness.Locked), f.service.beginExitCountdown(session.id))
-        assertEquals(EndResult.CountdownRequired, f.service.confirmEndEarly(session.id))
+        assertEquals(EndResult.NotAllowed(Strictness.Locked), f.service.confirmEndEarly(session.id))
         assertEquals(BreakResult.NotAllowed(Strictness.Locked), f.service.takeBreak(session.id))
         assertTrue(f.stored(session).isRunning)
         assertTrue(session.id in f.engine.applied)
@@ -67,5 +68,16 @@ class LockedTest {
         f.service.completeDueSessions()
 
         assertEquals(Outcome.Broken, f.stored(session).outcome)
+    }
+
+    @Test
+    fun raisingADelayedSessionToLockedMidCountdownStopsItEndingEarly() = runTest {
+        val session = f.startFor(1.hours, strictness = Strictness.Delayed)
+        f.service.beginExitCountdown(session.id)
+        f.service.edit(session.id, strictness = Strictness.Locked)
+        f.clock.advanceBy(31.seconds)
+
+        assertEquals(EndResult.NotAllowed(Strictness.Locked), f.service.confirmEndEarly(session.id))
+        assertTrue(f.stored(session).isRunning)
     }
 }

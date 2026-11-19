@@ -33,6 +33,7 @@ fun HomeRoute(
     onOpenStart: () -> Unit,
     onOpenBlockLists: () -> Unit,
     onOpenExitCountdown: (sessionId: String) -> Unit,
+    onOpenEditSession: (sessionId: String) -> Unit,
     sessionActions: @Composable (RunningSessionRow) -> Unit = {},
     viewModel: HomeViewModel = koinViewModel(),
 ) {
@@ -42,6 +43,7 @@ fun HomeRoute(
             HomeEffect.OpenStart -> onOpenStart()
             HomeEffect.OpenBlockLists -> onOpenBlockLists()
             is HomeEffect.OpenExitCountdown -> onOpenExitCountdown(effect.sessionId)
+            is HomeEffect.OpenEditSession -> onOpenEditSession(effect.sessionId)
         }
     }
     HomeScreen(state, viewModel::onIntent, sessionActions)
@@ -84,6 +86,7 @@ fun HomeScreen(
                         row = row,
                         onEnd = { onIntent(HomeIntent.EndClicked(row.id)) },
                         onTakeBreak = { onIntent(HomeIntent.TakeBreakClicked(row.id)) },
+                        onEdit = { onIntent(HomeIntent.EditClicked(row.id)) },
                     ) { sessionActions(row) }
                 }
             }
@@ -96,6 +99,7 @@ private fun RunningSessionCard(
     row: RunningSessionRow,
     onEnd: () -> Unit,
     onTakeBreak: () -> Unit,
+    onEdit: () -> Unit,
     actions: @Composable () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
@@ -129,6 +133,7 @@ private fun RunningSessionCard(
                 if (row.canEnd) {
                     OutlinedButton(onClick = onEnd) { Text(if (row.strictness == Strictness.Normal) "End session" else "End early") }
                 }
+                TextButton(onClick = onEdit) { Text("Edit") }
                 if (row.canTakeBreak) TextButton(onClick = onTakeBreak) { Text("Take a 5-minute Break") }
                 actions()
             }

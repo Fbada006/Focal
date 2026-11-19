@@ -5,6 +5,8 @@ import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
+import io.disruption.focal.core.session.BlockListChangeReport
+import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.core.session.SessionLock
 import io.disruption.focal.core.website.Domains
 import io.disruption.focal.core.website.InvalidDomainReason
@@ -17,12 +19,15 @@ import kotlin.uuid.Uuid
 /**
  * Rules for creating and editing Block Lists. Each edit is saved at once.
  *
- * Running Focus Sessions hold their own copy of what they block (ADR 0007), so editing a Block
- * List never weakens a running session. Deleting one that a running session uses is refused.
+ * Running Focus Sessions hold their own copy of what they block (ADR 0007). Additions reach the
+ * running sessions that use the list at once; removals reach Delayed and Locked sessions only
+ * after they end, and results say which sessions deferred them. Deleting a list that a running
+ * session uses is refused.
  */
 class BlockListService(
     private val blockLists: BlockListRepository,
     private val sessions: FocusSessionRepository,
+    private val sessionService: FocusSessionService,
     private val newId: () -> String = { Uuid.random().toString() },
     private val lock: SessionLock = SessionLock(),
 ) {
@@ -49,8 +54,9 @@ class BlockListService(
      * Refused while a running Focus Session uses the list, so deleting it can't end blocking. Holds
      * the [SessionLock], so no session can start on the list between the check and the delete.
      */
-    suspend fun delete(id: BlockListId): DeleteResult = lock.mutex.withLock {
-        edits.withLock {
+    suspend fun delete(id: BlockListId): DeleteResult = edits.withLock {
+        // Same order as edits, which call into the session service: edits, then the session lock.
+        lock.mutex.withLock {
             blockLists.get(id) ?: return DeleteResult.NotFound
             val users = sessions.getRunning().filter { it.blockListId == id }
             if (users.isNotEmpty()) return DeleteResult.InUse(users.map { it.name })
@@ -68,8 +74,8 @@ class BlockListService(
         return edits.withLock {
             val list = blockLists.get(id) ?: return DomainEditResult.NotFound
             if (hostname in list.blocked.domains) return DomainEditResult.AlreadyBlocked(hostname)
-            blockLists.save(list.withDomains(list.blocked.domains + hostname))
-            DomainEditResult.Saved(hostname)
+            val report = saveAndPropagate(list.withDomains(list.blocked.domains + hostname))
+            DomainEditResult.Saved(hostname, report.removalsDeferredFor)
         }
     }
 
@@ -82,8 +88,8 @@ class BlockListService(
         return edits.withLock {
             val list = blockLists.get(id) ?: return DomainEditResult.NotFound
             if (hostname != old && hostname in list.blocked.domains) return DomainEditResult.AlreadyBlocked(hostname)
-            blockLists.save(list.withDomains(list.blocked.domains - old + hostname))
-            DomainEditResult.Saved(hostname)
+            val report = saveAndPropagate(list.withDomains(list.blocked.domains - old + hostname))
+            DomainEditResult.Saved(hostname, report.removalsDeferredFor)
         }
     }
 
@@ -111,8 +117,13 @@ class BlockListService(
     private suspend fun update(id: BlockListId, change: (BlockList) -> BlockList): BlockListResult = edits.withLock {
         val list = blockLists.get(id) ?: return BlockListResult.NotFound
         val updated = change(list)
-        blockLists.save(updated)
-        BlockListResult.Saved(updated)
+        val report = saveAndPropagate(updated)
+        BlockListResult.Saved(updated, report.removalsDeferredFor)
+    }
+
+    private suspend fun saveAndPropagate(list: BlockList): BlockListChangeReport {
+        blockLists.save(list)
+        return sessionService.blockListChanged(list)
     }
 
     private fun BlockList.withDomains(domains: Set<String>) = copy(blocked = blocked.copy(domains = domains))
@@ -126,7 +137,11 @@ class BlockListService(
 }
 
 sealed interface BlockListResult {
-    data class Saved(val blockList: BlockList) : BlockListResult
+    /**
+     * [removalsDeferredFor] names running Delayed or Locked sessions that keep blocking removed
+     * items until they end ("Changes take effect after *Wind down* ends").
+     */
+    data class Saved(val blockList: BlockList, val removalsDeferredFor: List<String> = emptyList()) : BlockListResult
     data object InvalidName : BlockListResult
     data object NotFound : BlockListResult
 }
@@ -140,7 +155,7 @@ sealed interface DeleteResult {
 }
 
 sealed interface DomainEditResult {
-    data class Saved(val hostname: String) : DomainEditResult
+    data class Saved(val hostname: String, val removalsDeferredFor: List<String> = emptyList()) : DomainEditResult
     data class Invalid(val reason: InvalidDomainReason) : DomainEditResult
     data class AlreadyBlocked(val hostname: String) : DomainEditResult
     data object NotFound : DomainEditResult

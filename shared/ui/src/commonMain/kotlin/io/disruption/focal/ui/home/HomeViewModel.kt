@@ -41,12 +41,14 @@ sealed interface HomeIntent {
     data object BlockListsClicked : HomeIntent
     data class EndClicked(val sessionId: String) : HomeIntent
     data class TakeBreakClicked(val sessionId: String) : HomeIntent
+    data class EditClicked(val sessionId: String) : HomeIntent
 }
 
 sealed interface HomeEffect {
     data object OpenStart : HomeEffect
     data object OpenBlockLists : HomeEffect
     data class OpenExitCountdown(val sessionId: String) : HomeEffect
+    data class OpenEditSession(val sessionId: String) : HomeEffect
 }
 
 class HomeViewModel(
@@ -67,6 +69,7 @@ class HomeViewModel(
             HomeIntent.StartClicked -> emit(HomeEffect.OpenStart)
             HomeIntent.BlockListsClicked -> emit(HomeEffect.OpenBlockLists)
             is HomeIntent.EndClicked -> end(intent.sessionId)
+            is HomeIntent.EditClicked -> emit(HomeEffect.OpenEditSession(intent.sessionId))
             is HomeIntent.TakeBreakClicked -> viewModelScope.launch {
                 sessions.takeBreak(FocusSessionId(intent.sessionId))
             }

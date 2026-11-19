@@ -24,3 +24,9 @@ internal fun InvalidDomainReason.message(): String = when (this) {
 internal fun inUseMessage(sessionNames: List<String>): String =
     "This Block List can't be deleted while ${sessionNames.joinToString(", ")} " +
         "${if (sessionNames.size == 1) "is" else "are"} running. Delete it after the session ends."
+
+internal fun deferredMessage(sessionNames: List<String>): String {
+    val names = sessionNames.distinct()
+    return "Removals take effect after ${names.joinToString(" and ")} " +
+        "${if (names.size == 1) "ends" else "end"}. Additions apply now."
+}

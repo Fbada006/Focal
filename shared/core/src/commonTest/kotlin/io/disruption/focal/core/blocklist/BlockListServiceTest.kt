@@ -14,7 +14,7 @@ import kotlin.time.Duration.Companion.hours
 
 class BlockListServiceTest {
     private val f = SessionTestFixture()
-    private val service = BlockListService(f.blockLists, f.sessions, newId = { "new" })
+    private val service = BlockListService(f.blockLists, f.sessions, f.service, newId = { "new" })
 
     @Test
     fun createsAndRenamesWithATrimmedName() = runTest {

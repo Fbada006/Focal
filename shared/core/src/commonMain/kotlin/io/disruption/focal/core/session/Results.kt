@@ -49,3 +49,30 @@ sealed interface BreakResult {
     data object NoBreaksLeft : BreakResult
     data object AlreadyOnBreak : BreakResult
 }
+
+sealed interface EditResult {
+    data class Applied(val session: FocusSession) : EditResult
+    data object NotRunning : EditResult
+
+    /** The edit would weaken a Delayed or Locked session (ADR 0007). Nothing changed. */
+    data class Refused(val reason: EditRefusal) : EditResult
+}
+
+enum class EditRefusal {
+    /** An earlier end time. */
+    Shorten,
+
+    /** A lower Strictness. */
+    LowerStrictness,
+
+    /** An end time that isn't in the future. */
+    EndNotInFuture,
+}
+
+/** What happened to running sessions when their Block List changed. */
+data class BlockListChangeReport(
+    /** Sessions that now block more, applied at once. */
+    val tightened: List<FocusSession> = emptyList(),
+    /** Names of Delayed or Locked sessions that keep blocking removed items until they end. */
+    val removalsDeferredFor: List<String> = emptyList(),
+)

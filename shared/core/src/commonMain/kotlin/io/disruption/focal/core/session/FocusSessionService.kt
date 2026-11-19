@@ -2,6 +2,7 @@ package io.disruption.focal.core.session
 
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.ios.ExtensionEvent
+import io.disruption.focal.core.model.BlockList
 import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.BlockListId
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -123,6 +125,11 @@ class FocusSessionService(
             countdowns.remove(id)
             return EndResult.Ended(finish(session, Outcome.Completed, session.plannedEnd))
         }
+        // Only Delayed sessions end through a countdown. One raised to Locked mid-countdown can't.
+        if (session.strictness != Strictness.Delayed) {
+            countdowns.remove(id)
+            return EndResult.NotAllowed(session.strictness)
+        }
         val countdown = countdowns[id] ?: return EndResult.CountdownRequired
         if (now < countdown.endsAt) return EndResult.CountdownRequired
         countdowns.remove(id)
@@ -148,6 +155,69 @@ class FocusSessionService(
         sessions.save(updated)
         engine.pauseUntil(id, endsAt)
         BreakResult.Started(updated, endsAt)
+    }
+
+    /**
+     * Change a running session's end time and/or Strictness. A running session can only get
+     * stricter (ADR 0007): a later end and a higher Strictness always apply at once; an earlier end
+     * or a lower Strictness is refused for Delayed and Locked sessions. Normal sessions accept any
+     * edit, since they could be ended anyway.
+     */
+    suspend fun edit(
+        id: FocusSessionId,
+        plannedEnd: Instant? = null,
+        strictness: Strictness? = null,
+        shiftEndBy: Duration? = null,
+    ): EditResult = mutex.withLock {
+        val session = sessions.get(id)?.takeIf { it.isRunning } ?: return EditResult.NotRunning
+        val now = clock.now()
+        if (now >= session.plannedEnd) return EditResult.NotRunning
+        val weakeningAllowed = session.strictness == Strictness.Normal
+        // A shift is applied to the stored end, so two quick "+15 min" taps add 30 minutes.
+        val newEnd = plannedEnd ?: shiftEndBy?.let { session.plannedEnd + it } ?: session.plannedEnd
+        val newStrictness = strictness ?: session.strictness
+
+        if (newEnd <= now) return EditResult.Refused(EditRefusal.EndNotInFuture)
+        if (newEnd < session.plannedEnd && !weakeningAllowed) return EditResult.Refused(EditRefusal.Shorten)
+        if (session.strictness.isStricterThan(newStrictness) && !weakeningAllowed) {
+            return EditResult.Refused(EditRefusal.LowerStrictness)
+        }
+
+        val updated = session.copy(plannedEnd = newEnd, strictness = newStrictness)
+        // An Exit Countdown belongs to a Delayed session; raising the Strictness drops it.
+        if (newStrictness != Strictness.Delayed) countdowns.remove(id)
+        if (updated != session) {
+            sessions.save(updated)
+            engine.apply(updated)
+            session.currentBreak(now)?.let { engine.pauseUntil(id, minOf(it.endsAt, newEnd)) }
+        }
+        EditResult.Applied(updated)
+    }
+
+    /**
+     * Bring running sessions that use [blockList] in line with an edit to it (ADR 0007). Additions
+     * are merged into each session's own copy and applied at once. Removals apply at once to Normal
+     * sessions; Delayed and Locked sessions keep blocking them until they end.
+     */
+    suspend fun blockListChanged(blockList: BlockList): BlockListChangeReport = mutex.withLock {
+        val tightened = mutableListOf<FocusSession>()
+        val deferred = mutableListOf<String>()
+        val now = clock.now()
+        for (session in sessions.getRunning().filter { it.blockListId == blockList.id && it.plannedEnd > now }) {
+            val newBlocked = if (session.strictness == Strictness.Normal) {
+                blockList.blocked
+            } else {
+                if (!blockList.blocked.containsAll(session.blocked)) deferred += session.name
+                session.blocked + blockList.blocked
+            }
+            if (newBlocked == session.blocked) continue
+            val updated = session.copy(blocked = newBlocked)
+            sessions.save(updated)
+            engine.apply(updated)
+            session.currentBreak(now)?.let { engine.pauseUntil(session.id, it.endsAt) }
+            if (!session.blocked.containsAll(newBlocked)) tightened += updated
+        }
+        BlockListChangeReport(tightened, deferred)
     }
 
     /**

@@ -7,7 +7,10 @@ import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.session.FocusSessionService
+import io.disruption.focal.testing.FakeClock
 import io.disruption.focal.testing.InMemoryBlockListRepository
+import io.disruption.focal.testing.RecordingBlockingEngine
 import io.disruption.focal.testing.InMemoryFocusSessionRepository
 import io.disruption.focal.ui.MainDispatcherTest
 import kotlinx.coroutines.flow.first
@@ -25,7 +28,8 @@ class BlockListViewModelsTest : MainDispatcherTest() {
     private val social = BlockList(BlockListId("social"), "Social", BlockedSet(apps = setOf("a"), domains = setOf("x.com", "y.com")))
     private val blockLists = InMemoryBlockListRepository(social)
     private val sessions = InMemoryFocusSessionRepository()
-    private val service = BlockListService(blockLists, sessions, newId = { "new" })
+    private val sessionService = FocusSessionService(blockLists, sessions, RecordingBlockingEngine(), FakeClock())
+    private val service = BlockListService(blockLists, sessions, sessionService, newId = { "new" })
 
     @Test
     fun listsAreShownWithASummary() = runTest {

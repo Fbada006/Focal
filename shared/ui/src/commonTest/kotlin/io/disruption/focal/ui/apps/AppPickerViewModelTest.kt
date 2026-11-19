@@ -5,9 +5,13 @@ import io.disruption.focal.core.apps.InstalledAppsSource
 import io.disruption.focal.ui.MainDispatcherTest
 import io.disruption.focal.ui.SessionUiFixture
 import io.disruption.focal.ui.social
+import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.session.SessionLength
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.time.Duration.Companion.hours
 
 class AppPickerViewModelTest : MainDispatcherTest() {
     private val f = SessionUiFixture()
@@ -43,5 +47,15 @@ class AppPickerViewModelTest : MainDispatcherTest() {
 
         assertEquals(setOf("com.zhiliaoapp.musically"), f.blockListRepository.get(social.id)!!.blocked.apps)
         assertEquals(1, vm.state.value.selectedCount)
+    }
+
+    @Test
+    fun unpickingAnAppARunningDelayedSessionUsesSaysTheRemovalIsDeferred() = runTest {
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Delayed)
+        val vm = vm()
+
+        vm.onIntent(AppPickerIntent.Toggled("com.instagram.android"))
+
+        assertNotNull(vm.state.value.notice)
     }
 }
