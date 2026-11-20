@@ -94,7 +94,7 @@ class LockedTest {
         f.service.checkPermissions(listOf(Permission.AccessibilityService))
         assertEquals(listOf(locked.id), f.service.brokenToAcknowledge.first().map { it.id })
 
-        f.service.acknowledgeBroken()
+        f.service.acknowledgeBroken(listOf(locked.id))
         assertTrue(f.service.brokenToAcknowledge.first().isEmpty())
     }
 
@@ -107,21 +107,51 @@ class LockedTest {
         val restarted = f.newService()
         assertEquals(listOf(locked.id), restarted.brokenToAcknowledge.first().map { it.id })
 
-        restarted.acknowledgeBroken()
+        restarted.acknowledgeBroken(listOf(locked.id))
         assertTrue(f.newService().brokenToAcknowledge.first().isEmpty())
     }
 
     @Test
     fun aSessionBrokenAfterTheLastDismissalIsWarnedAbout() = runTest {
-        f.startFor(1.hours, strictness = Strictness.Locked)
+        val first = f.startFor(1.hours, strictness = Strictness.Locked)
         f.service.checkPermissions(listOf(Permission.AccessibilityService))
-        f.service.acknowledgeBroken()
+        f.service.acknowledgeBroken(listOf(first.id))
         f.clock.advanceBy(1.minutes)
 
         val second = f.startFor(1.hours, strictness = Strictness.Locked)
         f.service.checkPermissions(listOf(Permission.ScreenTime))
 
         assertEquals(listOf(second.id), f.service.brokenToAcknowledge.first().map { it.id })
+    }
+
+    @Test
+    fun dismissingAWarningOnlyAcknowledgesTheSessionsItNamed() = runTest {
+        val shown = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+        val displayed = f.service.brokenToAcknowledge.first().map { it.id }
+
+        // Another session becomes Broken after Home rendered the warning, before OK is tapped.
+        val unseen = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+        f.service.acknowledgeBroken(displayed)
+
+        assertEquals(listOf(shown.id), displayed)
+        assertEquals(listOf(unseen.id), f.service.brokenToAcknowledge.first().map { it.id })
+    }
+
+    @Test
+    fun aClockSetBackDoesNotHideALaterBrokenSession() = runTest {
+        val first = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+        f.service.acknowledgeBroken(listOf(first.id))
+
+        // The device clock is set back 20 minutes, then another Locked session breaks.
+        f.clock.advanceBy((-20).minutes)
+        val second = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+
+        assertEquals(listOf(second.id), f.service.brokenToAcknowledge.first().map { it.id })
+        assertEquals(listOf(second.id), f.newService().brokenToAcknowledge.first().map { it.id }, "after a restart too")
     }
 
     @Test

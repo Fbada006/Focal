@@ -20,7 +20,6 @@ import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -54,24 +53,22 @@ class FocusSessionService(
 
     /**
      * Sessions recorded as Broken that the user hasn't acknowledged yet, oldest first, so whichever
-     * check noticed the revocation, the UI can still warn about it (story 41). The acknowledgement
-     * is stored, so a warning survives Focal's process dying before Home is opened.
+     * check noticed the revocation, the UI can still warn about it (story 41). Acknowledgements are
+     * stored by session, so a warning survives Focal's process dying before Home is opened, and a
+     * device clock set back can't hide one.
      */
     val brokenToAcknowledge: Flow<List<FocusSession>> =
-        combine(sessions.observeAll(), preferences.brokenWarningsSeenUntil) { all, seenUntil ->
-            unacknowledged(all, seenUntil)
+        combine(sessions.observeAll(), preferences.acknowledgedBrokenSessions) { all, acknowledged ->
+            all.filter { it.outcome == Outcome.Broken && it.id !in acknowledged }.sortedBy { it.endedAt }
         }
 
-    /** The user has seen the warning for every session [brokenToAcknowledge] lists now. */
-    suspend fun acknowledgeBroken() {
-        val seenUntil = preferences.brokenWarningsSeenUntil.first()
-        val latest = unacknowledged(sessions.observeAll().first(), seenUntil).lastOrNull()?.endedAt ?: return
-        preferences.setBrokenWarningsSeenUntil(latest)
+    /**
+     * The user dismissed the warning that named [ids]. Only those are acknowledged: a session that
+     * became Broken after the warning was shown still gets its own.
+     */
+    suspend fun acknowledgeBroken(ids: Collection<FocusSessionId>) {
+        if (ids.isNotEmpty()) preferences.acknowledgeBrokenSessions(ids.toSet())
     }
-
-    private fun unacknowledged(all: List<FocusSession>, seenUntil: Instant?): List<FocusSession> = all
-        .filter { it.outcome == Outcome.Broken && it.endedAt != null && (seenUntil == null || it.endedAt > seenUntil) }
-        .sortedBy { it.endedAt }
 
     /** Running sessions, ordered by planned end. */
     val running: Flow<List<FocusSession>> = sessions.observeRunning()

@@ -59,9 +59,9 @@ class InMemoryAppPreferences(onboardingCompleted: Boolean = false) : AppPreferen
         this.completed.value = completed
     }
 
-    private val brokenSeenUntil = MutableStateFlow<Instant?>(null)
-    override val brokenWarningsSeenUntil: Flow<Instant?> = brokenSeenUntil
-    override suspend fun setBrokenWarningsSeenUntil(seenUntil: Instant) {
-        brokenSeenUntil.value = seenUntil
+    private val acknowledgedBroken = MutableStateFlow<Set<FocusSessionId>>(emptySet())
+    override val acknowledgedBrokenSessions: Flow<Set<FocusSessionId>> = acknowledgedBroken
+    override suspend fun acknowledgeBrokenSessions(ids: Set<FocusSessionId>) {
+        acknowledgedBroken.update { it + ids }
     }
 }

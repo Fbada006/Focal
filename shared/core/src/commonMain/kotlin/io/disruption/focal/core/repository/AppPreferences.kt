@@ -1,7 +1,7 @@
 package io.disruption.focal.core.repository
 
+import io.disruption.focal.core.model.FocusSessionId
 import kotlinx.coroutines.flow.Flow
-import kotlin.time.Instant
 
 /** Small app preferences (ADR 0009: DataStore, not the database). */
 interface AppPreferences {
@@ -9,9 +9,11 @@ interface AppPreferences {
     suspend fun setOnboardingCompleted(completed: Boolean)
 
     /**
-     * The user has dismissed the warning for every session that became Broken at or before this
-     * (story 41). Null until the first dismissal.
+     * Broken sessions whose warning the user has dismissed (story 41). Kept by session, not by time,
+     * so a device clock set back can't hide a later session's warning.
      */
-    val brokenWarningsSeenUntil: Flow<Instant?>
-    suspend fun setBrokenWarningsSeenUntil(seenUntil: Instant)
+    val acknowledgedBrokenSessions: Flow<Set<FocusSessionId>>
+
+    /** Add [ids] to [acknowledgedBrokenSessions]. */
+    suspend fun acknowledgeBrokenSessions(ids: Set<FocusSessionId>)
 }

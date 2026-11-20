@@ -76,7 +76,7 @@ Focal checks whenever it might notice a revocation:
 - **Focal's process starts** (`FocalApplication.restoreSessions`, before re-applying sessions): catches a revocation while the process was dead. The sticky foreground service brings the process back, and so does opening Focal or a reboot.
 - **Home comes to the foreground**, alongside the fix-it banner.
 
-Home warns about every session Broken since the user last dismissed the warning, whichever check found it (`FocusSessionService.brokenToAcknowledge`). The dismissal is stored in preferences (`brokenWarningsSeenUntil`), so a warning survives Focal's process dying before Home opens, say with notifications off. The unbind and process-start paths also post a "Locked session Broken" notification that opens Home. A session that ran out before the check finds the revocation is Completed, not Broken.
+Home warns about every Broken session whose warning the user hasn't dismissed, whichever check found it (`FocusSessionService.brokenToAcknowledge`). Dismissing acknowledges exactly the sessions the warning named, stored by session id in preferences (`acknowledgedBrokenSessions`), so a warning survives Focal's process dying before Home opens (say, with notifications off), a session broken while the warning was showing still gets its own, and a device clock set back can't hide one. The unbind and process-start paths also post a "Locked session Broken" notification that opens Home. A session that ran out before the check finds the revocation is Completed, not Broken.
 
 **Uninstalling is an accepted escape.** An uninstalled app can't detect or record its own removal, so no outcome is recorded and on-device history goes with it (ADR 0002, ADR 0003).
 

@@ -46,6 +46,8 @@ data class HomeState(
     val breakUnavailableFor: String? = null,
     /** Locked sessions just recorded as Broken because blocking was switched off (story 41). */
     val brokenWarning: String? = null,
+    /** The sessions [brokenWarning] names; dismissing it acknowledges exactly these. */
+    val brokenWarningSessionIds: List<String> = emptyList(),
 ) {
     val canStart: Boolean get() = permissionsChecked && missingPermissions.isEmpty()
 }
@@ -60,7 +62,8 @@ sealed interface HomeIntent {
     data class TakeBreakClicked(val sessionId: String) : HomeIntent
     data class EditClicked(val sessionId: String) : HomeIntent
     data class FixPermissionClicked(val permission: Permission) : HomeIntent
-    data object BrokenWarningDismissed : HomeIntent
+    /** OK on the Broken warning that named [sessionIds]. */
+    data class BrokenWarningDismissed(val sessionIds: List<String>) : HomeIntent
 
     /** Focal came back to the foreground; permissions may have changed. */
     data object Resumed : HomeIntent
@@ -87,7 +90,12 @@ class HomeViewModel(
         refreshPermissions()
         viewModelScope.launch {
             sessions.brokenToAcknowledge.collect { broken ->
-                setState { copy(brokenWarning = broken.takeIf { it.isNotEmpty() }?.let { warningFor(it) }) }
+                setState {
+                    copy(
+                        brokenWarning = broken.takeIf { it.isNotEmpty() }?.let { warningFor(it) },
+                        brokenWarningSessionIds = broken.map { it.id.value },
+                    )
+                }
             }
         }
         viewModelScope.launch {
@@ -100,7 +108,9 @@ class HomeViewModel(
         when (intent) {
             HomeIntent.StartClicked -> if (currentState.canStart) emit(HomeEffect.OpenStart)
             HomeIntent.Resumed -> refreshPermissions()
-            HomeIntent.BrokenWarningDismissed -> viewModelScope.launch { sessions.acknowledgeBroken() }
+            is HomeIntent.BrokenWarningDismissed -> viewModelScope.launch {
+                sessions.acknowledgeBroken(intent.sessionIds.map(::FocusSessionId))
+            }
             is HomeIntent.FixPermissionClicked -> permissions.request(intent.permission)
             HomeIntent.BlockListsClicked -> emit(HomeEffect.OpenBlockLists)
             HomeIntent.SchedulesClicked -> emit(HomeEffect.OpenSchedules)

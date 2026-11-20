@@ -89,7 +89,7 @@ fun HomeScreen(
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         Text(warning, color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(onClick = { onIntent(HomeIntent.BrokenWarningDismissed) }) { Text("OK") }
+                        TextButton(onClick = { onIntent(HomeIntent.BrokenWarningDismissed(state.brokenWarningSessionIds)) }) { Text("OK") }
                     }
                 }
             }

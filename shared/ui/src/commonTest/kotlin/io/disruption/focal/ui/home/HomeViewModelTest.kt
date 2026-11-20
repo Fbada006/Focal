@@ -161,8 +161,23 @@ class HomeLockedTest : MainDispatcherTest() {
         assertEquals(listOf(Permission.AccessibilityService), vm.state.value.missingPermissions)
         assertTrue(vm.state.value.brokenWarning!!.contains("Broken"))
 
-        vm.onIntent(HomeIntent.BrokenWarningDismissed)
+        vm.onIntent(HomeIntent.BrokenWarningDismissed(vm.state.value.brokenWarningSessionIds))
         assertEquals(null, vm.state.value.brokenWarning)
+    }
+
+    @Test
+    fun dismissingTheWarningLeavesASessionBrokenSinceItWasShown() = runTest {
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Locked)
+        f.sessions.checkPermissions(listOf(Permission.AccessibilityService))
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
+        val shown = vm.state.value.brokenWarningSessionIds
+        assertEquals(listOf("s1"), shown)
+
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Locked)
+        f.sessions.checkPermissions(listOf(Permission.AccessibilityService))
+        vm.onIntent(HomeIntent.BrokenWarningDismissed(shown))
+
+        assertEquals(listOf("s2"), vm.state.value.brokenWarningSessionIds)
     }
 
     @Test
