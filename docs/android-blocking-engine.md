@@ -41,6 +41,12 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
 - **Running Focus Sessions** run in a **foreground service** with an honest, ongoing notification showing the timer.
   - Android 14+: declare a `foregroundServiceType` (likely `specialUse`) and justify it in Play Console.
   - Android 12+ blocks most background starts: start it while the app is visible or from an allowed trigger (e.g. an exact alarm).
+- **Breaks** (T19) need no alarm. A Break only lifts blocking inside Focal's own process, so it can only end while that process is alive or on its next start:
+  - Every foreground event checks Breaks against the wall clock (`BlockingState`), so switching apps after the Break's end is blocked even if a timer ran late.
+  - For a user who stays in a blocked app, the engine refreshes the Shield at the Break's end, and the foreground service wakes then to put the notification back from "On a Break until …" to "Blocking until …". With several sessions the notification names the one it describes: the soonest-ending session that is blocking, or, when all are on a Break, the one whose Break ends first (`BlockingState.summary`). A Break that runs to the session's end doesn't promise blocking afterwards.
+  - The service's wake-up time is `BlockingState.nextChange`; a session already past its planned end counts as due now, so it is completed before anything else is waited for.
+  - After process death, Android restarts the accessibility service (and the sticky foreground service), and `FocusSessionService.restore` re-pauses a Break still in progress or re-applies the session if it has ended.
+  - An exact alarm would add a permission (`SCHEDULE_EXACT_ALARM`, asked only with the first Schedule) without blocking anything sooner.
 - **Schedules** use exact alarms: `setExactAndAllowWhileIdle` with `SCHEDULE_EXACT_ALARM`. Users can revoke this on Android 13+, so check `canScheduleExactAlarms()` and guide them back.
 - Re-register all alarms on `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED`.
 - **Persist active session state on disk** (Room or DataStore) so a restarted process resumes the active Focus Session instead of silently ending it. On-device only, per ADR 0003; no server sync in v1.

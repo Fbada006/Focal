@@ -11,6 +11,7 @@ import io.disruption.focal.FocalApplication
 import io.disruption.focal.MainActivity
 import io.disruption.focal.R
 import io.disruption.focal.core.blocking.BlockingEngine
+import io.disruption.focal.core.blocking.BlockingState
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.session.FocusSessionService
 import kotlinx.coroutines.CoroutineScope
@@ -34,7 +35,9 @@ import kotlin.time.Instant
 /**
  * Keeps Focal alive while any Focus Session runs and shows the ongoing timer notification (T13,
  * docs/android-blocking-engine.md §3). It also completes sessions whose planned end passes while
- * the UI is closed, which lifts their blocking.
+ * the UI is closed, which lifts their blocking, and wakes at each Break's end to show that blocking
+ * is back (T19). After process death the system restarts this service and the accessibility
+ * service, and `FocusSessionService.restore` re-pauses a Break still in progress.
  */
 class RunningSessionService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -58,7 +61,7 @@ class RunningSessionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val engine = engine ?: return START_NOT_STICKY
-        startForeground(NOTIFICATION_ID, buildNotification(engine.running.value))
+        startForeground(NOTIFICATION_ID, buildNotification(engine.running.value, Clock.System.now()))
         job?.cancel()
         job = scope.launch {
             // After a sticky restart `running` is empty until the restore has re-applied the saved
@@ -70,14 +73,18 @@ class RunningSessionService : Service() {
                     if (!engine.hasSessions) stopSelf()
                     return@collectLatest
                 }
-                notifications?.notify(NOTIFICATION_ID, buildNotification(sessions))
-                // Wake up when the next session ends, and re-plan if the set changes meanwhile.
-                val wait = (sessions.first().plannedEnd - Clock.System.now()).coerceAtLeast(1.seconds)
-                delay(wait)
-                // Completing lifts sessions, which changes `running` and would cancel this block
-                // mid-batch. The wait stays cancellable; the batch must finish.
-                withContext(NonCancellable) {
-                    runCatching { sessionService().completeDueSessions() }
+                // Breaks end without `running` changing, so loop on the next change ourselves.
+                while (true) {
+                    val now = Clock.System.now()
+                    notifications?.notify(NOTIFICATION_ID, buildNotification(sessions, now))
+                    val next = BlockingState(sessions).nextChange(now) ?: break
+                    delay((next - Clock.System.now()).coerceAtLeast(1.seconds))
+                    if (sessions.none { it.plannedEnd <= Clock.System.now() }) continue
+                    // Completing lifts sessions, which changes `running` and would cancel this block
+                    // mid-batch. The wait stays cancellable; the batch must finish.
+                    withContext(NonCancellable) {
+                        runCatching { sessionService().completeDueSessions() }
+                    }
                 }
             }
         }
@@ -94,18 +101,27 @@ class RunningSessionService : Service() {
 
     private fun sessionService(): FocusSessionService = GlobalContext.get().get()
 
-    private fun buildNotification(sessions: List<FocusSession>): Notification {
-        val holding = sessions.minByOrNull { it.plannedEnd }
-        val others = sessions.size - 1
+    private fun buildNotification(sessions: List<FocusSession>, now: Instant): Notification {
+        // Which session to describe, and whether it is on a Break, is BlockingState's rule (T19).
+        val summary = BlockingState(sessions).summary(now)
+        val holding = summary?.session
+        val others = summary?.otherSessions ?: 0
         val title = when {
             holding == null -> "Focus Session"
-            others > 0 -> "${sessions.size} Focus Sessions"
+            others > 0 -> "${others + 1} Focus Sessions"
             else -> holding.name
         }
+        // With several sessions, say which one the times belong to.
+        val subject = if (holding != null && others > 0) "${holding.name}: " else ""
+        val more = if (others > 0) " (+$others more)" else ""
+        val breakEnd = summary?.breakEndsAt
         val text = when {
             holding == null -> "Blocking until the session ends"
-            others > 0 -> "Blocking until ${clockTime(holding.plannedEnd)} (+$others more)"
-            else -> "Blocking until ${clockTime(holding.plannedEnd)}"
+            // The Break lifts this session's blocking only; it ends on its own (T19, story 36).
+            breakEnd != null && summary.resumesAfterBreak ->
+                "${subject}On a Break until ${clockTime(breakEnd)}, then blocking until ${clockTime(holding.plannedEnd)}$more"
+            breakEnd != null -> "${subject}On a Break until the session ends at ${clockTime(holding.plannedEnd)}$more"
+            else -> "${subject}Blocking until ${clockTime(holding.plannedEnd)}$more"
         }
         val open = PendingIntent.getActivity(
             this,
