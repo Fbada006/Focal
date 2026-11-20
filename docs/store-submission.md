@@ -44,7 +44,7 @@ Not declared, on purpose: `QUERY_ALL_PACKAGES`, `REQUEST_IGNORE_BATTERY_OPTIMIZA
 
 **What the service reads, and why.**
 
-1. *Window state changes (all apps):* the package name of the app that came to the foreground. Used to decide whether a running Focus Session blocks it. Nothing else about the window is read.
+1. *Window state changes (all apps):* the package name of the app that came to the foreground. Used to decide whether a running Focus Session blocks it. Nothing else about the window is read. The service receives these events, and reads supported browsers' address bars (below), whenever it is turned on, not only while a session runs; between sessions nothing matches and nothing is shown.
 2. *Supported browsers only (Chrome family, Edge, Brave, Vivaldi, Kiwi, Samsung Internet, Firefox family, Opera, DuckDuckGo; list in `SupportedBrowsers`, `shared/core`):* the text of the browser's **address bar**, found through its view ID, to learn which website is open so a blocked website can be Shielded. Content-change and text-change events are used only to notice navigation inside an open browser window. Text in a focused address bar (the user typing) is ignored; only the committed hostname is used.
 3. The service does **not** read page content, form fields, passwords, messages, or text from any other app. It does not read the address bar of browsers that are not on the supported list. Non-hostname text (search terms, an empty tab) is discarded.
 
@@ -68,8 +68,8 @@ Play requires a video demonstrating the prominent disclosure and the feature. Re
 4. Back in Focal: create a Block List with one app (for example a social app) and one website (for example a news site) typed as a domain.
 5. Start a Normal Focus Session (short, for example 15 minutes) with that Block List. Show the running-session notification.
 6. Open the blocked app. Show the Shield: the Focus Session name, time left, and only "Close" and "Open Focal".
-7. Open a supported browser (for example Chrome), navigate to the blocked website. Show the Shield appearing. Then navigate to an unblocked site to show nothing is blocked and nothing is shown.
-8. Tap "Open Focal", end the Normal session. Show the Shield no longer appears.
+7. Open a supported browser (for example Chrome) and navigate to an unblocked site first, to show nothing is blocked and nothing is shown. Then navigate to the blocked website and show the Shield appearing; leave it on screen (it covers the browser, so there is no navigating away from it).
+8. On that Shield, tap "Open Focal" and end the Normal session. Show the Shield no longer appears.
 9. Show Focal's permissions summary and, to prove the claim, system App info > Permissions with no network or other sensitive permissions requested (or the Play listing's permissions screen).
 10. Show turning the service off in Accessibility settings, and Focal's fix-it banner prompting to restore it.
 
@@ -103,7 +103,7 @@ Focal declares `SCHEDULE_EXACT_ALARM`, not `USE_EXACT_ALARM`, because Play allow
 | --- | --- |
 | Does your app collect or share any of the required user data types? | **No** |
 | Is all of the user data collected by your app encrypted in transit? | Not applicable (no data leaves the device) |
-| Do you provide a way for users to request that their data be deleted? | Not applicable; uninstalling the app deletes all data stored by Focal. |
+| Do you provide a way for users to request that their data be deleted? | Not applicable; uninstalling the app deletes all data Focal stores on the device. While `allowBackup` is on, a copy in the user's own Google backup is kept and deleted under their backup settings, and may be restored on reinstall (see below). |
 | Data types collected | None |
 | Data types shared | None |
 | Third-party SDKs that collect data | None (human to confirm by checking the release dependency list, including transitive libraries, before submitting) |

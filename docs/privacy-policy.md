@@ -15,11 +15,11 @@ Focal has no accounts and no server. We do not collect, receive, sell or share a
 - The Block Lists, Schedules and settings you create.
 - Your Focus Sessions: when they ran, how long, their Strictness and outcome (Completed, Ended Early or Broken), and the Streak and stats computed from them.
 
-This data never leaves your device through Focal. If you delete Focal, this data is deleted with it.
+This data never leaves your device through Focal. If you delete Focal, this data is deleted from your device with it. A copy in your own device backup (see Backups) is not: it stays until that backup is replaced or deleted, and may be restored if you install Focal again.
 
 ## What Focal looks at to work
 
-**Android.** Focal uses an accessibility service, which you turn on yourself in system settings. While a Focus Session runs, the service notices which app is in the foreground so Focal can show the Shield over apps you blocked. In supported browsers it reads only the address bar, to see which website is open. It does not read page content, messages, passwords or anything you type elsewhere. This information is compared with your Block List on the device and then discarded. It is not saved, sent or shared.
+**Android.** Focal uses an accessibility service, which you turn on yourself in system settings. While the service is turned on, it notices which app is in the foreground, and in supported browsers it reads only the address bar to see which website is open. It does this whether or not a Focus Session is running; Focal acts on it only to show the Shield over apps and websites a running session blocks. It does not read page content, messages, passwords or anything you type elsewhere. This information is compared with your Block List on the device and then discarded. It is not saved, sent or shared.
 
 **iOS.** Focal uses Apple's Screen Time frameworks (FamilyControls, ManagedSettings, DeviceActivity) with your approval. The apps and App Categories you pick in Apple's picker come back to Focal as opaque tokens that stay on your device; Focal cannot tell which apps they are, or which apps you used or for how long. Websites are different: you type them as domain names (for example `example.com`), so Focal stores those readable domains in your Block Lists, on your device only, and hands them to Screen Time to block.
 
@@ -48,7 +48,7 @@ Focal is not directed at children and we do not knowingly collect information fr
 
 ## Your choices
 
-Turn off the accessibility service or Screen Time access in system settings at any time (Focal will tell you, and a running Locked session will be recorded as Broken). Uninstall Focal to remove all of its data.
+Turn off the accessibility service or Screen Time access in system settings at any time (Focal will tell you, and a running Locked session will be recorded as Broken). Uninstall Focal to remove all of its data from your device (a copy in your own device backup stays under your backup settings; see Backups).
 
 ## Changes
 
