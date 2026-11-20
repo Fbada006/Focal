@@ -46,6 +46,8 @@ sealed interface BlockListEditorIntent {
     data object CancelDomainEdit : BlockListEditorIntent
     data class RemoveDomain(val domain: String) : BlockListEditorIntent
     data class SuggestionToggled(val serviceId: String) : BlockListEditorIntent
+    /** iOS: Apple's picker returned these app and App Category tokens; they replace the list's. */
+    data class AppSelectionPicked(val apps: Set<String>, val appCategories: Set<String>) : BlockListEditorIntent
     data object DeleteClicked : BlockListEditorIntent
     data object DeleteConfirmed : BlockListEditorIntent
     data object DeleteDismissed : BlockListEditorIntent
@@ -113,6 +115,10 @@ class BlockListEditorViewModel(
                 }
             }
             is BlockListEditorIntent.SuggestionToggled -> toggleSuggestion(intent.serviceId)
+            is BlockListEditorIntent.AppSelectionPicked -> viewModelScope.launch {
+                val result = service.setAppSelection(id, intent.apps, intent.appCategories)
+                if (result is BlockListResult.Saved) showDeferred(result.removalsDeferredFor)
+            }
             BlockListEditorIntent.DeleteClicked -> setState { copy(confirmingDelete = true) }
             BlockListEditorIntent.DeleteDismissed -> setState { copy(confirmingDelete = false) }
             BlockListEditorIntent.DeleteConfirmed -> delete()

@@ -32,7 +32,8 @@ fun startFocal(
     permissionGateway: PermissionGateway = PendingPermissionGateway(),
 ) {
     val koin = initKoin(blockingEngine, permissionGateway, platformModules = listOf(iosUiModule)).koin
-    MainScope().launch { ingestOnLaunch(koin.get<FocusSessionService>(), readExtensionEvents()) }
+    val scope = MainScope()
+    scope.launch { ingestOnLaunch(koin.get<FocusSessionService>(), readExtensionEvents()) }
 }
 
 @OptIn(ExperimentalForeignApi::class)

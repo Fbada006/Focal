@@ -4,7 +4,11 @@ import Shared
 @main
 struct iOSApp: App {
     init() {
-        StartFocalKt.startFocal(blockingEngine: PendingBlockingEngine(), permissionGateway: PendingPermissionGateway())
+        IosScreenTimeBridge.shared.picker = ScreenTimeAppPicker.shared
+        StartFocalKt.startFocal(
+            blockingEngine: PendingBlockingEngine(),
+            permissionGateway: ScreenTimePermissionGateway()
+        )
     }
 
     var body: some Scene {

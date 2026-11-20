@@ -121,6 +121,30 @@ class BlockListViewModelsTest : MainDispatcherTest() {
     }
 
     @Test
+    fun aPickedAppSelectionReplacesTheListsApps() = runTest {
+        val vm = BlockListEditorViewModel("social", service, FakeSuggestedWebsites)
+        vm.onIntent(BlockListEditorIntent.AppSelectionPicked(setOf("a", "b"), setOf("games")))
+
+        assertEquals(setOf("a", "b"), vm.state.value.apps)
+        assertEquals(setOf("games"), vm.state.value.appCategories)
+        assertNull(vm.state.value.notice)
+    }
+
+    @Test
+    fun unpickingAppsARunningLockedSessionUsesSaysTheRemovalIsDeferred() = runTest {
+        val start = Instant.parse("2026-01-05T09:00:00Z")
+        sessions.save(
+            FocusSession(FocusSessionId("s"), social.id, "Social", Strictness.Locked, start, start + 1.hours, social.blocked),
+        )
+        val vm = BlockListEditorViewModel("social", service, FakeSuggestedWebsites)
+        vm.onIntent(BlockListEditorIntent.AppSelectionPicked(emptySet(), emptySet()))
+
+        assertEquals(emptySet(), blockLists.get(social.id)?.blocked?.apps)
+        val notice = assertNotNull(vm.state.value.notice)
+        assertTrue("Social" in notice)
+    }
+
+    @Test
     fun renamingTrimsAndRefusesBlankNames() = runTest {
         val vm = BlockListEditorViewModel("social", service, FakeSuggestedWebsites)
         vm.onIntent(BlockListEditorIntent.NameChanged("  "))
