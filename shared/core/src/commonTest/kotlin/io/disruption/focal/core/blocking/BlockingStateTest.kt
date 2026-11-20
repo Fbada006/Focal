@@ -94,6 +94,37 @@ class BlockingStateTest {
     }
 
     @Test
+    fun aBlockedSiteInABrowserIsShieldedAsAWebsiteOfThatBrowser() {
+        val state = BlockingState(listOf(session("s1", blocked = BlockedSet(domains = setOf("youtube.com")))))
+
+        val shielded = state.forForeground("com.android.chrome", null, "m.youtube.com", now)
+
+        assertEquals(Shielded.Website(state.forWebsite("youtube.com", now)!!, browser = "com.android.chrome"), shielded)
+    }
+
+    @Test
+    fun aBlockedBrowserIsShieldedAsAnAppWhateverSiteItShows() {
+        val state = BlockingState(
+            listOf(
+                session("s1", blocked = BlockedSet(apps = setOf("com.android.chrome"))),
+                session("s2", blocked = BlockedSet(domains = setOf("youtube.com"))),
+            ),
+        )
+
+        val shielded = state.forForeground("com.android.chrome", null, "youtube.com", now)
+
+        assertEquals(Shielded.App(state.forApp("com.android.chrome", null, now)!!), shielded)
+    }
+
+    @Test
+    fun aBrowserOnAnUnblockedSiteOrNoSiteIsNotShielded() {
+        val state = BlockingState(listOf(session("s1", blocked = BlockedSet(domains = setOf("youtube.com")))))
+
+        assertNull(state.forForeground("com.android.chrome", null, "example.com", now))
+        assertNull(state.forForeground("com.android.chrome", null, null, now))
+    }
+
+    @Test
     fun nothingIsBlockedWhenNoSessionMatchesOrSessionsHaveEnded() {
         val ended = session("s1", endIn = -1.minutes)
 

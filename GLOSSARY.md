@@ -15,7 +15,7 @@ A named group of apps, such as Social or Games, that can be added to a Block Lis
 _Avoid_: Group, genre, type
 
 **Shield**:
-The screen shown in place of a blocked app or website. It names the Focus Session holding the block and its time left, and offers only two ways forward: close the blocked app, or open Focal. A Focus Session can never be ended or paused from the Shield.
+The screen shown in place of a blocked app or website. It names the Focus Session holding the block and its time left, and offers only two ways forward: close the blocked app, or open Focal. On Android, closing a blocked website opens a new tab in the same browser instead of going home. A Focus Session can never be ended or paused from the Shield.
 _Avoid_: Overlay, block screen, lock screen
 
 **Suggested Website**:

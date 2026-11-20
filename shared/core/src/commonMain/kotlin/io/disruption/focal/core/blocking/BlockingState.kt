@@ -16,6 +16,19 @@ data class ShieldContent(
     val motivationalLine: String,
 )
 
+/**
+ * What the Shield covers on Android, which decides where its Close button goes: a blocked app
+ * closes to the home screen; a blocked website closes to a new tab in the same [browser], so the
+ * browser stays usable for sites that aren't blocked.
+ */
+sealed interface Shielded {
+    val content: ShieldContent
+
+    data class App(override val content: ShieldContent) : Shielded
+
+    data class Website(override val content: ShieldContent, val browser: String) : Shielded
+}
+
 /** One running session the running-session notification names, and whether it is on a Break. */
 data class RunningSummary(
     val session: FocusSession,
@@ -41,6 +54,15 @@ class BlockingState(private val sessions: List<FocusSession>) {
     /** The Shield for a browser showing [host], or null when no running session blocks it. */
     fun forWebsite(host: String, now: Instant): ShieldContent? =
         shieldFor(now) { it.blocked.blocksWebsite(host) }
+
+    /**
+     * The Shield for the foreground app [packageName] (in App Category [category]) and, in a
+     * supported browser, the committed site [host] it shows. The app is checked first: a browser
+     * that is itself blocked is Shielded as an app, whatever site it shows.
+     */
+    fun forForeground(packageName: String, category: String?, host: String?, now: Instant): Shielded? =
+        forApp(packageName, category, now)?.let { Shielded.App(it) }
+            ?: host?.let { forWebsite(it, now) }?.let { Shielded.Website(it, browser = packageName) }
 
     /**
      * The next moment what is blocked changes on its own: the soonest planned end or Break end, or

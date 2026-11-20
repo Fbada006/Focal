@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 import io.disruption.focal.core.apps.AppCategoryResolver
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.blocking.BlockingState
-import io.disruption.focal.core.blocking.ShieldContent
+import io.disruption.focal.core.blocking.Shielded
 import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
@@ -43,7 +43,7 @@ class AndroidBlockingEngine(
 ) : BlockingEngine {
     private val applied = MutableStateFlow<Map<FocusSessionId, FocusSession>>(emptyMap())
     private val foreground = MutableStateFlow<Foreground?>(null)
-    private val _shield = MutableStateFlow<ShieldContent?>(null)
+    private val _shielded = MutableStateFlow<Shielded?>(null)
 
     /**
      * Shield refreshes come from the accessibility service on Main and from session and Break-end
@@ -66,11 +66,11 @@ class AndroidBlockingEngine(
     /** Whether any session is applied right now; [running] follows a moment later. */
     val hasSessions: Boolean get() = applied.value.isNotEmpty()
 
-    /** What the Shield should show over the current foreground app, or null to hide it. */
-    val shield: StateFlow<ShieldContent?> = _shield.asStateFlow()
+    /** What the Shield covers over the current foreground app, and shows, or null to hide it. */
+    val shielded: StateFlow<Shielded?> = _shielded.asStateFlow()
 
     /** The foreground app the Shield covers right now, or null when nothing is Shielded. */
-    val shieldedApp: String? get() = synchronized(shieldLock) { foreground.value?.packageName?.takeIf { _shield.value != null } }
+    val shieldedApp: String? get() = synchronized(shieldLock) { foreground.value?.packageName?.takeIf { _shielded.value != null } }
 
     /**
      * The accessibility service reports each foreground package; null means "left the app". For a
@@ -111,11 +111,9 @@ class AndroidBlockingEngine(
 
     private fun refreshShield() = synchronized(shieldLock) {
         val current = foreground.value
-        _shield.value = current?.let {
-            val state = BlockingState(applied.value.values.toList())
-            val now = clock.now()
-            state.forApp(packageName = it.packageName, category = categoryOf(it.packageName), now = now)
-                ?: it.host?.let { host -> state.forWebsite(host, now) }
+        _shielded.value = current?.let {
+            BlockingState(applied.value.values.toList())
+                .forForeground(it.packageName, categoryOf(it.packageName), it.host, clock.now())
         }
     }
 
