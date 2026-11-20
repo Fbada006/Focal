@@ -23,12 +23,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // A recreated activity already handled its Intent.
-        if (savedInstanceState == null) entry = intent.entryScreen()
+        // A recreated activity restores a request App hadn't opened yet; its Intent was read before.
+        entry = if (savedInstanceState == null) intent.entryScreen() else savedInstanceState.entryScreen()
 
         setContent {
             App(androidContent, entry = entry, onEntryHandled = { entry = null })
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        entry?.let { outState.putString(EXTRA_ENTRY_SCREEN, it.name) }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -46,8 +51,11 @@ class MainActivity : ComponentActivity() {
                 .putExtra(EXTRA_ENTRY_SCREEN, screen.name)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
-        private fun Intent.entryScreen(): EntryScreen? =
-            getStringExtra(EXTRA_ENTRY_SCREEN)?.let { name -> EntryScreen.entries.firstOrNull { it.name == name } }
+        private fun Intent.entryScreen(): EntryScreen? = entryScreenNamed(getStringExtra(EXTRA_ENTRY_SCREEN))
+
+        private fun Bundle.entryScreen(): EntryScreen? = entryScreenNamed(getString(EXTRA_ENTRY_SCREEN))
+
+        private fun entryScreenNamed(name: String?): EntryScreen? = EntryScreen.entries.firstOrNull { it.name == name }
     }
 }
 

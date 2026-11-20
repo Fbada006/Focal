@@ -72,10 +72,10 @@ class StatsWidget : GlanceAppWidget() {
 
     companion object {
         /** 2x1: focus today only. */
-        private val TINY = DpSize(110.dp, 40.dp)
+        private val TINY = DpSize(110.dp, 56.dp)
 
         /** 3x1 and wider: the three numbers side by side. */
-        private val ROW = DpSize(180.dp, 40.dp)
+        private val ROW = DpSize(180.dp, 56.dp)
 
         /** 2x2 and taller: the three numbers stacked. */
         private val COLUMN = DpSize(110.dp, 140.dp)
@@ -92,7 +92,7 @@ class StatsWidget : GlanceAppWidget() {
             .fillMaxSize()
             .appWidgetBackground()
             .background(GlanceTheme.colors.widgetBackground)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
             .clickable(actionStartActivity(MainActivity.intentFor(context, EntryScreen.Stats)))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             modifier = modifier.cornerRadius(android.R.dimen.system_app_widget_background_radius)

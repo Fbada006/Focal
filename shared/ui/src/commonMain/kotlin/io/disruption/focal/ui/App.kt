@@ -44,7 +44,8 @@ enum class EntryScreen { Stats }
 
 /**
  * [entry], when set, is opened on top of Home once navigation is ready, then reported through
- * [onEntryHandled] so the caller can clear it. Before onboarding is completed it is dropped.
+ * [onEntryHandled] so the caller can clear it. Before onboarding is completed it is dropped. Back
+ * from it returns to Home.
  */
 @Composable
 fun App(
@@ -59,9 +60,16 @@ fun App(
         val nav = rememberNavController()
         LaunchedEffect(entry) {
             if (entry == null) return@LaunchedEffect
-            if (completed) {
+            // Home is on the back stack once onboarding is completed, including when it was
+            // completed in this activity after `completed` was read.
+            val onboarded = runCatching { nav.getBackStackEntry<Home>() }.isSuccess
+            if (onboarded) {
                 when (entry) {
-                    EntryScreen.Stats -> nav.navigate(Stats) { launchSingleTop = true }
+                    // Back from the entry screen returns to Home, whatever was open before.
+                    EntryScreen.Stats -> nav.navigate(Stats) {
+                        popUpTo<Home>()
+                        launchSingleTop = true
+                    }
                 }
             }
             onEntryHandled()

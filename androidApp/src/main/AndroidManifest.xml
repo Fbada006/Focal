@@ -103,7 +103,7 @@
         <!-- The home-screen stats widget (story 75). -->
         <receiver
             android:name=".widget.StatsWidgetReceiver"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/stats_widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
