@@ -15,7 +15,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** The data behind the v1 fixtures in `iosApp/Fixtures`. Change both together. */
+/** The data behind the fixtures in `iosApp/Fixtures`. Change both together. */
 object ContractSamples {
     val now: Instant = Instant.parse("2026-01-05T09:10:00Z")
     private val start = Instant.parse("2026-01-05T09:00:00Z")

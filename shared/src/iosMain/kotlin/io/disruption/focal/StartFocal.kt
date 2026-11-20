@@ -4,6 +4,7 @@ import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.ios.IosContract
 import io.disruption.focal.core.ios.ingestOnLaunch
 import io.disruption.focal.core.permissions.PermissionGateway
+import io.disruption.focal.core.schedule.ScheduleService
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.ui.di.iosUiModule
 import kotlinx.cinterop.BetaInteropApi
@@ -34,24 +35,28 @@ const val APP_GROUP_ID = "group.io.disruption.focal"
 const val EXTENSION_EVENTS_FILE = "extension-events.json"
 
 /**
- * Entry point for Swift: `StartFocalKt.startFocal(blockingEngine: …, permissionGateway: …)` from
- * `iOSApp.init`. The Swift side supplies the Screen Time engine (T16) and permissions (T15).
- * Starts Koin, then ingests what the extensions did while Focal wasn't running.
+ * Entry point for Swift: `StartFocalKt.startFocal(blockingEngine: …, permissionGateway: …,
+ * activityScheduler: …)` from `iOSApp.init`. The Swift side supplies the Screen Time engine (T16),
+ * permissions (T15) and DeviceActivity registration (T31). Starts Koin, then ingests what the
+ * extensions did while Focal wasn't running.
  */
 fun startFocal(
     blockingEngine: BlockingEngine = PendingBlockingEngine(),
     permissionGateway: PermissionGateway = PendingPermissionGateway(),
+    activityScheduler: DeviceActivityScheduler = NoDeviceActivityScheduler(),
 ) {
     val koin = initKoin(blockingEngine, permissionGateway, platformModules = listOf(iosUiModule)).koin
     val scope = MainScope()
-    // Keep the extensions' snapshot current, then ingest what they did while Focal wasn't running.
-    IosSnapshotWriter(koin.get(), koin.get(), koin.get()).start(scope)
+    // Keep the extensions' snapshot and DeviceActivity intervals current (T31), then ingest what
+    // they did while Focal wasn't running.
+    IosSnapshotWriter(koin.get(), koin.get(), koin.get(), activityScheduler).start(scope)
     // Screen Time access revoked while Focal was away makes running Locked sessions Broken (T23).
     val catchUp = {
         scope.launch {
             val missing = runCatching { permissionGateway.missing() }.getOrDefault(emptyList())
             val log = readExtensionEvents()
-            ingestOnLaunch(koin.get<FocusSessionService>(), log, missing)
+            // Then start a Schedule window whose DeviceActivity start didn't fire (T31).
+            ingestOnLaunch(koin.get<FocusSessionService>(), log, missing, koin.get<ScheduleService>())
             // Ingested events are now in the database; drop them so the log only holds what's pending.
             if (log != null) compactExtensionEvents(ingested = log)
         }

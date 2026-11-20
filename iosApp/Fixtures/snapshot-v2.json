@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "generatedAt": "2026-01-05T09:10:00Z",
   "blockLists": [
     {
@@ -48,6 +48,7 @@
       "id": "fs-1",
       "name": "Work hours",
       "strictness": "Delayed",
+      "scheduleId": "sch-work",
       "startedAt": "2026-01-05T09:00:00Z",
       "plannedEnd": "2026-01-05T17:30:00Z",
       "apps": [

@@ -1,5 +1,6 @@
 package io.disruption.focal
 
+import io.disruption.focal.core.ios.DeviceActivityPlan
 import io.disruption.focal.core.ios.IosContract
 import io.disruption.focal.core.ios.IosSnapshot
 import io.disruption.focal.core.repository.BlockListRepository
@@ -25,23 +26,37 @@ const val SNAPSHOT_FILE = "snapshot.json"
  * Writes [IosSnapshot] to the App Group on every change to Block Lists, Schedules or running
  * sessions (T16, ADR 0008). The extensions make no decisions: they read this file, apply it, and
  * append events the app ingests on launch.
+ *
+ * After each write it hands the [DeviceActivityPlan] to [activities] when the plan changed (T31):
+ * one interval per switched-on Schedule day and one per running session's planned end. The
+ * snapshot is written first, so an interval that fires as soon as it is registered reads the
+ * snapshot it belongs to.
  */
 class IosSnapshotWriter(
     private val blockLists: BlockListRepository,
     private val schedules: ScheduleRepository,
     private val sessions: FocusSessionRepository,
+    private val activities: DeviceActivityScheduler = NoDeviceActivityScheduler(),
     private val clock: Clock = Clock.System,
 ) {
-    /** Start observing; the first emission writes the snapshot straight away. */
+    /** Start observing; the first emission writes the snapshot and registers the plan straight away. */
     fun start(scope: CoroutineScope) {
         scope.launch {
+            var registered: DeviceActivityPlan? = null
             combine(
                 blockLists.observeAll(),
                 schedules.observeAll(),
                 sessions.observeRunning(),
             ) { lists, allSchedules, running ->
-                IosSnapshot.from(clock.now(), lists, allSchedules, running)
-            }.collect(::write)
+                val now = clock.now()
+                IosSnapshot.from(now, lists, allSchedules, running) to DeviceActivityPlan.from(allSchedules, running, now)
+            }.collect { (snapshot, plan) ->
+                write(snapshot)
+                if (plan != registered) {
+                    activities.monitor(plan)
+                    registered = plan
+                }
+            }
         }
     }
 

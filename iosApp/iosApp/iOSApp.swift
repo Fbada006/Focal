@@ -13,7 +13,9 @@ struct iOSApp: App {
         UNUserNotificationCenter.current().delegate = notifications
         StartFocalKt.startFocal(
             blockingEngine: blockingEngine,
-            permissionGateway: ScreenTimePermissionGateway()
+            permissionGateway: ScreenTimePermissionGateway(),
+            // Schedules and session ends while Focal isn't running (T31).
+            activityScheduler: IosDeviceActivityScheduler()
         )
     }
 

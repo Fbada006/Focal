@@ -13,7 +13,7 @@ class IosFixturesTest {
 
     @Test
     fun snapshotFixtureMatchesTheEncoder() {
-        val fixture = File(dir, "snapshot-v1.json").readText()
+        val fixture = File(dir, "snapshot-v2.json").readText()
         assertEquals(fixture.trim(), IosContract.encodeSnapshot(ContractSamples.snapshot))
         assertEquals(ContractSamples.snapshot, IosContract.decodeSnapshot(fixture))
     }

@@ -24,7 +24,8 @@ data class IosSnapshot(
     val runningSessions: List<SnapshotSession>,
 ) {
     companion object {
-        const val CURRENT_VERSION = 1
+        /** 2 added [SnapshotSession.scheduleId] (T31). */
+        const val CURRENT_VERSION = 2
 
         fun from(
             generatedAt: Instant,
@@ -58,6 +59,7 @@ data class IosSnapshot(
                     id = session.id.value,
                     name = session.name,
                     strictness = session.strictness.name,
+                    scheduleId = session.scheduleId?.value,
                     startedAt = session.startedAt,
                     plannedEnd = session.plannedEnd,
                     apps = session.blocked.apps.sorted(),
@@ -105,6 +107,11 @@ data class SnapshotSession(
     val id: String,
     val name: String,
     val strictness: String,
+    /**
+     * The Schedule that started it, if any. The monitor extension doesn't start a second session
+     * for a Schedule window the app already started (T31).
+     */
+    val scheduleId: String? = null,
     @Serializable(IsoInstantSerializer::class)
     val startedAt: Instant,
     @Serializable(IsoInstantSerializer::class)
