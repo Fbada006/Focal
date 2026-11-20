@@ -17,9 +17,10 @@ import io.disruption.focal.core.session.IngestReport
  *
  * Last, [schedules] starts any Schedule window open now that has no session yet: a backstop for a
  * window whose DeviceActivity start didn't fire (T31). It runs after ingesting, so a window the
- * extension already started isn't started twice. Without a permission blocking depends on (Screen
- * Time access), nothing is started: the session couldn't block, and a Locked one would escape the
- * check that makes it Broken (T23). The window starts once access is back, if still open.
+ * extension already started isn't started twice. It is [ScheduleService.catchUp], the same rule
+ * Android's alarms follow (T30): without a permission blocking depends on (Screen Time access),
+ * nothing is started, since the session couldn't block and a Locked one would escape the check that
+ * makes it Broken (T23). The window starts once access is back, if still open.
  */
 suspend fun ingestOnLaunch(
     service: FocusSessionService,
@@ -30,6 +31,6 @@ suspend fun ingestOnLaunch(
     val report = service.ingest(eventLog?.let(IosContract::decodeEvents).orEmpty())
     service.checkPermissions(missing)
     service.restore()
-    if (missing.none { it.blockingDependsOn }) schedules?.evaluate()
+    schedules?.catchUp(missing)
     return report
 }
