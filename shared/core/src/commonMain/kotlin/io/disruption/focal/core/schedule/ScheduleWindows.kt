@@ -41,6 +41,12 @@ object ScheduleWindows {
             .firstOrNull { it.start > after }
     }
 
+    /** The soonest window start after [after] among the switched-on [schedules], or null if none. */
+    fun nextStart(schedules: List<Schedule>, after: Instant, zone: TimeZone): Instant? = schedules
+        .filter { it.enabled }
+        .mapNotNull { next(it, after, zone)?.start }
+        .minOrNull()
+
     /** The window that starts on [date], or null if the Schedule doesn't run that day. */
     fun window(schedule: Schedule, date: LocalDate, zone: TimeZone): ScheduleWindow? {
         if (date.dayOfWeek !in schedule.days) return null

@@ -37,12 +37,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.ui.components.EmptyMessage
 import io.disruption.focal.ui.components.FocalTopBar
 import io.disruption.focal.ui.components.SectionTitle
 import io.disruption.focal.ui.home.description
 import io.disruption.focal.ui.home.label
 import io.disruption.focal.ui.mvi.CollectEffects
+import io.disruption.focal.ui.permissions.copy
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
 import org.koin.compose.viewmodel.koinViewModel
@@ -215,6 +217,17 @@ fun ScheduleEditorScreen(state: ScheduleEditorState, onIntent: (ScheduleEditorIn
             text = { Text("A session it already started keeps running until it ends.") },
             confirmButton = { TextButton(onClick = { onIntent(ScheduleEditorIntent.DeleteConfirmed) }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { onIntent(ScheduleEditorIntent.DeleteDismissed) }) { Text("Cancel") } },
+        )
+    }
+
+    if (state.askingForAlarms) {
+        val copy = Permission.ExactAlarms.copy()
+        AlertDialog(
+            onDismissRequest = { onIntent(ScheduleEditorIntent.AlarmsNotNowClicked) },
+            title = { Text(copy.title) },
+            text = { Text(copy.explanation) },
+            confirmButton = { TextButton(onClick = { onIntent(ScheduleEditorIntent.AllowAlarmsClicked) }) { Text(copy.action) } },
+            dismissButton = { TextButton(onClick = { onIntent(ScheduleEditorIntent.AlarmsNotNowClicked) }) { Text("Not now") } },
         )
     }
 }

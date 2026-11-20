@@ -1,6 +1,7 @@
 package io.disruption.focal.core.schedule
 
 import io.disruption.focal.core.model.BlockListId
+import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
@@ -11,6 +12,7 @@ import io.disruption.focal.core.time.TimeZoneProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /** What the user fills in for a Schedule. */
@@ -77,6 +79,19 @@ class ScheduleService(
 
     /** Start the sessions due now for every Schedule. */
     suspend fun evaluate() = sessions.evaluateSchedules(schedules.getAll(), timeZone.current())
+
+    /**
+     * Complete sessions that ran out and start the ones Schedules have due now. Platforms call it
+     * when a Schedule alarm fires, after a reboot and when the clock or time zone changes; a start
+     * that was missed meanwhile still starts, for what is left of its window (T28, T30).
+     */
+    suspend fun catchUp(): List<FocusSession> {
+        sessions.completeDueSessions()
+        return evaluate()
+    }
+
+    /** When to wake Focal next for a Schedule start or a session end; see [FocusSessionService.nextWakeUp]. */
+    suspend fun nextWakeUp(): Instant? = sessions.nextWakeUp(schedules.getAll(), timeZone.current())
 
     private suspend fun save(id: ScheduleId, draft: ScheduleDraft): ScheduleSaveResult {
         val name = draft.name.trim()

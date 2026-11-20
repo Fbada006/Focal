@@ -29,5 +29,5 @@ val uiModule: Module = module {
     viewModel { RootViewModel(get()) }
     viewModel { SchedulesViewModel(get()) }
     viewModel { StatsViewModel(get(), get(), get()) }
-    viewModel { (id: String) -> ScheduleEditorViewModel(id.ifEmpty { null }, get(), get()) }
+    viewModel { (id: String) -> ScheduleEditorViewModel(id.ifEmpty { null }, get(), get(), get()) }
 }

@@ -165,6 +165,19 @@ class FocusSessionService(
     }
 
     /**
+     * When the platform must next wake Focal to keep Schedules on time with Focal closed (T30): the
+     * soonest of the next window start of a switched-on Schedule and the planned end of a running
+     * session, after now. At that moment, call [completeDueSessions] and [evaluateSchedules], then
+     * ask again. Null when nothing is due.
+     */
+    suspend fun nextWakeUp(schedules: List<Schedule>, zone: TimeZone): Instant? = mutex.withLock {
+        val now = clock.now()
+        val nextStart = ScheduleWindows.nextStart(schedules, now, zone)
+        val nextEnd = sessions.getRunning().map { it.plannedEnd }.filter { it > now }.minOrNull()
+        listOfNotNull(nextStart, nextEnd).minOrNull()
+    }
+
+    /**
      * Start the Exit Countdown for ending a Delayed session early. The user must wait it out and
      * then confirm with [confirmEndEarly]; leaving it cancels it ([cancelExitCountdown]).
      */

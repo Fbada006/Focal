@@ -3,7 +3,9 @@ package io.disruption.focal
 import android.app.Application
 import io.disruption.focal.blocking.AndroidBlockingEngine
 import io.disruption.focal.blocking.BrokenSessionNotifier
+import io.disruption.focal.blocking.ScheduleAlarms
 import io.disruption.focal.core.permissions.PermissionGateway
+import io.disruption.focal.core.schedule.ScheduleService
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.ui.di.androidUiModule
 import io.disruption.focal.ui.permissions.AndroidPermissionGateway
@@ -11,6 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.Koin
@@ -19,6 +23,7 @@ class FocalApplication : Application() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var koin: Koin
     private var restoreJob: Job? = null
+    private val alarms by lazy { ScheduleAlarms(this) }
 
     override fun onCreate() {
         super.onCreate()
@@ -31,12 +36,15 @@ class FocalApplication : Application() {
             androidContext(this@FocalApplication)
         }.koin
         restoreSessions()
+        keepScheduleAlarmArmed()
     }
 
     /**
      * Complete sessions that ran out while Focal wasn't running and re-apply the rest (T13). Called
      * on every process start, including one started by the boot receiver. A Locked session whose
      * blocking permission was revoked while the process was dead is recorded as Broken first (T22).
+     * Then Schedules catch up, so a start missed while the phone was off starts now, and the
+     * Schedule alarm is armed again (T30): a reboot clears it.
      */
     fun restoreSessions(): Job? {
         if (!::koin.isInitialized) return null
@@ -45,12 +53,37 @@ class FocalApplication : Application() {
         return scope.launch {
             runCatching { breakIfBlockingRevoked() }
             runCatching { koin.get<FocusSessionService>().restore() }
+            runCatching { catchUpAndArm() }
         }.also { restoreJob = it }
     }
 
     /** Wait for the restore started at process start, without starting another. */
     suspend fun awaitRestore() {
         restoreJob?.join()
+    }
+
+    /**
+     * The Schedule alarm fired, or the clock, time zone or exact-alarm permission changed: complete
+     * sessions that ran out, start Schedule sessions due now, and arm the next alarm (T30).
+     */
+    fun catchUpSchedules(): Job? {
+        if (!::koin.isInitialized) return null
+        return scope.launch { runCatching { catchUpAndArm() } }
+    }
+
+    private suspend fun catchUpAndArm() {
+        val schedules = koin.get<ScheduleService>()
+        schedules.catchUp()
+        alarms.arm(schedules.nextWakeUp())
+    }
+
+    /** Any change to Schedules or running sessions can move the next wake-up, so re-arm on each. */
+    private fun keepScheduleAlarmArmed() {
+        val schedules = koin.get<ScheduleService>()
+        scope.launch {
+            combine(schedules.observeAll(), koin.get<FocusSessionService>().running) { _, _ -> }
+                .collectLatest { runCatching { alarms.arm(schedules.nextWakeUp()) } }
+        }
     }
 
     /**
