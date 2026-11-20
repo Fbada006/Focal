@@ -43,4 +43,9 @@ class FocalApplication : Application() {
             runCatching { koin.get<FocusSessionService>().restore() }
         }.also { restoreJob = it }
     }
+
+    /** Wait for the restore started at process start, without starting another. */
+    suspend fun awaitRestore() {
+        restoreJob?.join()
+    }
 }

@@ -59,6 +59,9 @@ class AndroidBlockingEngine(
         .map { sessions -> sessions.values.sortedBy { it.plannedEnd } }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
+    /** Whether any session is applied right now; [running] follows a moment later. */
+    val hasSessions: Boolean get() = applied.value.isNotEmpty()
+
     /** What the Shield should show over the current foreground app, or null to hide it. */
     val shield: StateFlow<ShieldContent?> = _shield.asStateFlow()
 
@@ -138,26 +141,36 @@ class AndroidBlockingEngine(
 }
 
 /**
- * The package names that are never Shielded, even if a Block List picks them: window-event noise
- * (System UI, the launcher, keyboards), Focal itself, and the screens ADR 0002 keeps reachable
- * (Settings, the permission controller and the package installer, including OEM variants).
+ * The package names that are never Shielded, even if a Block List picks them. Two kinds:
+ * - [isLeaving]: the launcher, Focal itself, and the screens ADR 0002 keeps reachable (Settings, the
+ *   permission controller and the package installer, including OEM variants). Reaching one means the
+ *   user left the app, so the Shield lifts.
+ * - [isTransient]: windows that open over the app without leaving it (System UI's shade and
+ *   dialogs, the keyboard). The app underneath is still in front, so the remembered foreground app
+ *   stays; otherwise a Break ending while the user types would find no app to Shield.
  */
 internal class NoisePackages(context: Context) {
-    private val packages: Set<String> = buildSet {
+    private val leaving: Set<String> = buildSet {
         add(context.packageName)
-        add("com.android.systemui")
         addAll(SYSTEM_ESCAPE_PACKAGES)
         resolvedPackage(context, Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))?.let(::add)
         resolvedPackage(context, Intent(Settings.ACTION_SETTINGS))?.let(::add)
         resolvedPackage(context, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
             ?.let(::add)
         resolvedPackage(context, Intent(Intent.ACTION_DELETE, Uri.parse("package:${context.packageName}")))?.let(::add)
+    }
+
+    private val transient: Set<String> = buildSet {
+        add("com.android.systemui")
         val inputMethods = context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
         inputMethods?.enabledInputMethodList?.forEach { add(it.packageName) }
         inputMethods?.inputMethodList?.forEach { add(it.packageName) }
     }
 
-    operator fun contains(packageName: String): Boolean = packageName in packages
+    fun isLeaving(packageName: String): Boolean = packageName in leaving
+
+    // A launcher or Settings that is also an IME still means "left the app".
+    fun isTransient(packageName: String): Boolean = packageName in transient && packageName !in leaving
 
     private companion object {
         /** AOSP and Google builds; OEM Settings and installers are added by resolving their intents. */

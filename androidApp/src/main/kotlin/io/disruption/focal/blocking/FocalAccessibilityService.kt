@@ -62,8 +62,10 @@ class FocalAccessibilityService : AccessibilityService() {
         // The Shield window is Focal's own and fires window events when shown. Only a Focal
         // Activity means the user really came to Focal; anything else keeps the current block.
         if (packageName == this.packageName && !isFocalActivity(event.className)) return
-        // Leaving the app (launcher, System UI, keyboard) or returning to Focal lifts the Shield.
-        if (packageName in noise) {
+        // The keyboard and System UI open over the app without leaving it: keep the app in front.
+        if (noise.isTransient(packageName)) return
+        // Leaving the app (launcher, Settings) or returning to Focal lifts the Shield.
+        if (noise.isLeaving(packageName)) {
             engine.onForeground(null)
             return
         }

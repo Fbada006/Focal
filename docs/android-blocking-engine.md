@@ -8,7 +8,7 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
 
 - **Apps**: an `AccessibilityService` listening for `TYPE_WINDOW_STATE_CHANGED`. The event carries the package name, arrives instantly, and costs nothing when nothing changes.
 - Keep the service config narrow: only the event types we need.
-- Ignore noise packages that also fire window events: Focal itself, the launcher, System UI, the keyboard (IME). Only a Focal Activity counts as "came to Focal"; events from Focal's own Shield window are ignored so the Shield doesn't hide itself.
+- Handle noise packages that also fire window events. Focal itself and the launcher mean the user left the app, so the Shield lifts; only a Focal Activity counts as "came to Focal", and events from Focal's own Shield window are ignored so the Shield doesn't hide itself. System UI (shade, dialogs) and the keyboard (IME) open over the app without leaving it, so they are ignored and the app underneath stays the foreground app (a Break ending while the user types still finds it).
 - Never Shield Settings, the permission controller or the package installer (AOSP, Google and the device's resolved Settings/uninstall handlers), even if a Block List picks them (ADR 0002).
 - **Websites**: same service, with `canRetrieveWindowContent` enabled, reading the address bar of supported browsers via a per-browser lookup table (package name → address-bar view ID).
   - `canRetrieveWindowContent` only grants access to the view tree; it doesn't decide *when* we look. Following a link, switching tabs or typing a new URL happens inside the same browser window and need not fire `TYPE_WINDOW_STATE_CHANGED`.

@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import io.disruption.focal.FocalApplication
 import io.disruption.focal.MainActivity
 import io.disruption.focal.R
 import io.disruption.focal.core.blocking.BlockingEngine
@@ -60,9 +61,13 @@ class RunningSessionService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification(engine.running.value))
         job?.cancel()
         job = scope.launch {
+            // After a sticky restart `running` is empty until the restore has re-applied the saved
+            // sessions; stopping then would leave them without this service.
+            (application as? FocalApplication)?.awaitRestore()
             engine.running.collectLatest { sessions ->
                 if (sessions.isEmpty()) {
-                    stopSelf()
+                    // `running` is derived and can lag `apply`; only stop when nothing is applied.
+                    if (!engine.hasSessions) stopSelf()
                     return@collectLatest
                 }
                 notifications?.notify(NOTIFICATION_ID, buildNotification(sessions))
