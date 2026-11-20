@@ -3,14 +3,17 @@ package io.disruption.focal.blocking
 import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.provider.Browser
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import io.disruption.focal.FocalApplication
 import io.disruption.focal.MainActivity
 import io.disruption.focal.core.blocking.BlockingEngine
+import io.disruption.focal.core.blocking.Shielded
 import io.disruption.focal.core.website.AddressBarReading
 import io.disruption.focal.core.website.BrowserWindow
 import io.disruption.focal.core.website.CommittedSite
@@ -61,10 +64,7 @@ class FocalAccessibilityService : AccessibilityService() {
 
         val overlay = ShieldOverlay(
             service = this,
-            onClose = {
-                performGlobalAction(GLOBAL_ACTION_HOME)
-                engine.onForeground(null)
-            },
+            onClose = { close(engine) },
             onOpenFocal = {
                 startActivity(
                     Intent(this, MainActivity::class.java)
@@ -77,7 +77,7 @@ class FocalAccessibilityService : AccessibilityService() {
         this.overlay = overlay
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        engine.shield.onEach(overlay::render).launchIn(scope)
+        engine.shielded.onEach { overlay.render(it?.content) }.launchIn(scope)
         this.scope = scope
     }
 
@@ -120,6 +120,33 @@ class FocalAccessibilityService : AccessibilityService() {
         if (window == BrowserWindow.NotReady) engine.onForeground(packageName, site.update(packageName, null))
         scheduleAddressBarCheck(packageName, window)
     }
+
+    /**
+     * The Shield's Close: a blocked website closes to a new tab in the same browser, so the browser
+     * stays usable for other sites; a blocked app (or a browser that can't open the tab) closes to
+     * the home screen ([Shielded]).
+     */
+    private fun close(engine: AndroidBlockingEngine) {
+        val website = engine.shielded.value as? Shielded.Website
+        // The new tab's address bar may not be readable at first: don't carry the blocked site over.
+        forgetBrowser()
+        if (website == null || !openNewTab(website.browser)) performGlobalAction(GLOBAL_ACTION_HOME)
+        engine.onForeground(null)
+    }
+
+    /**
+     * Open a blank tab in [browser]. `about:blank` is the one blank page browsers accept from an
+     * intent (Chrome refuses `chrome://newtab`), and it is no website, so the new tab isn't Shielded.
+     */
+    private fun openNewTab(browser: String): Boolean = runCatching {
+        startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(BLANK_PAGE))
+                .setPackage(browser)
+                .putExtra(Browser.EXTRA_CREATE_NEW_TAB, true)
+                .putExtra(Browser.EXTRA_APPLICATION_ID, browser)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.isSuccess
 
     /** The user left the browser: its site and pending check no longer describe what is in front. */
     private fun forgetBrowser() {
@@ -208,6 +235,9 @@ class FocalAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 }
+
+/** The page a blocked website's Close opens in a new tab. */
+private const val BLANK_PAGE = "about:blank"
 
 /** How long browser content changes are gathered before the address bar is read again. */
 private const val ADDRESS_BAR_CHECK_DELAY_MS = 250L
