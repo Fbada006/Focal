@@ -72,8 +72,13 @@ private let appGroup = "group.io.disruption.focal"
 ///
 /// One file per session in the App Group container. Every change to a session's record and its
 /// store happens inside `update`, under `NSFileCoordinator` on that file, which serialises the app
-/// and the extension across processes: the monitor never re-applies a set older than the app's
+/// and the extensions across processes: the monitor never re-applies a set older than the app's
 /// latest, nor a session the app has just lifted (lifting deletes the record in the same step).
+///
+/// The record is also how the monitor tells a session's current planned end (T31): `edit` re-applies
+/// an extended session with its new end, so a callback for the old end, checking inside the same
+/// coordination, finds it still running. Sessions the monitor starts for Schedules get a record
+/// too, and that is all the Shield knows of them until the app ingests them.
 struct FocalAppliedSession: Codable, Equatable {
     var apps: [String]
     var appCategories: [String]
@@ -81,17 +86,45 @@ struct FocalAppliedSession: Codable, Equatable {
     var plannedEnd: Date
     /// When the Break in progress (or the last one) ends; the store is cleared until then.
     var breakEndsAt: Date?
+    /// The session's name, for the Shield before the snapshot lists the session.
+    var name: String? = nil
+    /// The Schedule that started it, so the monitor starts no second session in its window (T31).
+    var scheduleId: String? = nil
+    /// The Schedule activity whose window the monitor started it in, so that window's end can end
+    /// it (`ScheduleSessions`). Nil for a session the app started.
+    var scheduleActivity: String? = nil
 }
 
 enum FocalAppliedSessions {
     private static let directory = "applied-sessions"
 
     private static func url(sessionId: String) -> URL? {
-        guard let container = FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroup) else { return nil }
-        let folder = container.appendingPathComponent(directory, isDirectory: true)
+        guard let folder else { return nil }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder.appendingPathComponent(sessionId + ".json")
+    }
+
+    private static var folder: URL? {
+        FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
+            .appendingPathComponent(directory, isDirectory: true)
+    }
+
+    /// Every session's record, by session id, as it is now. For lookups only (the Shield, finding a
+    /// window's session): anything that changes a session or its store goes through `update`, which
+    /// reads the record again under coordination. Files are written atomically, so a read never sees
+    /// half a record.
+    static func all() -> [String: FocalAppliedSession] {
+        guard let folder,
+              let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        else { return [:] }
+        var records: [String: FocalAppliedSession] = [:]
+        for file in files where file.pathExtension == "json" {
+            guard let data = try? Data(contentsOf: file),
+                  let record = try? JSONDecoder().decode(FocalAppliedSession.self, from: data) else { continue }
+            records[file.deletingPathExtension().lastPathComponent] = record
+        }
+        return records
     }
 
     /// Run [body] with exclusive access to [sessionId]'s record, across the app and its extensions;

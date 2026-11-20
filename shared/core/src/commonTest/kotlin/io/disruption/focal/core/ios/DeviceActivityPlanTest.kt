@@ -154,4 +154,35 @@ class DeviceActivityPlanTest {
         assertTrue(off.replacesSchedulesOf(monday), "switching off stops it")
         assertTrue(monday.replacesSchedulesOf(null), "nothing known about what is registered")
     }
+
+    @Test
+    fun sessionEndsKeepTheirPlaceWhenSchedulesFillTheActivityLimit() = runTest {
+        val session = f.startFor(1.hours)
+        val everyWeekday = setOf(MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY)
+        // Four Schedules on five days each: 20 Schedule activities, the whole limit on their own.
+        val schedules = (1..4).map { schedule(everyWeekday, LocalTime(9, 0), LocalTime(10, 0), id = "sch-$it") }
+        val plan = DeviceActivityPlan.from(schedules, f.sessions.getRunning(), f.clock.now)
+        assertEquals(DeviceActivityPlan.ACTIVITY_LIMIT, plan.schedules.size)
+
+        val fitted = plan.fitting(DeviceActivityPlan.ACTIVITY_LIMIT)
+
+        assertEquals(plan.sessionEnds, fitted.sessionEnds, "every session end is kept")
+        assertEquals(plan.schedules.dropLast(1), fitted.schedules, "the last Schedule activity makes room")
+        assertEquals(DeviceActivityPlan.ACTIVITY_LIMIT, fitted.names.size)
+    }
+
+    @Test
+    fun aPlanThatFitsIsKeptWholeAndNoRoomKeepsNothing() = runTest {
+        f.startFor(1.hours)
+        val plan = DeviceActivityPlan.from(
+            listOf(schedule(setOf(MONDAY), LocalTime(9, 0), LocalTime(10, 0))),
+            f.sessions.getRunning(),
+            f.clock.now,
+        )
+
+        assertEquals(plan, plan.fitting(DeviceActivityPlan.ACTIVITY_LIMIT))
+        assertEquals(plan.sessionEnds, plan.fitting(1).sessionEnds)
+        assertEquals(emptyList(), plan.fitting(1).schedules)
+        assertEquals(emptySet(), plan.fitting(-3).names, "Breaks alone can fill the limit")
+    }
 }

@@ -352,6 +352,31 @@ class IosContractTest {
     }
 
     @Test
+    fun theSnapshotKeepsEachSchedulesRecentSessionsEvenOnesEndedEarly() {
+        // T31: the monitor extension starts no second session in a window one of these overlaps.
+        val bySchedule = ContractSamples.snapshot.schedules.associate { it.id to it.sessions }
+        assertEquals(
+            listOf(SnapshotScheduleSession(Instant.parse("2026-01-04T22:00:00Z"), Instant.parse("2026-01-05T07:00:00Z"))),
+            bySchedule.getValue("sch-wind-down"),
+            "ended early, it still holds its window until its planned end",
+        )
+        assertEquals(listOf(ContractSamples.running.startedAt), bySchedule.getValue("sch-work").map { it.startedAt })
+    }
+
+    @Test
+    fun aScheduleSessionOlderThanTheHistoryIsLeftOut() {
+        val old = ContractSamples.running.copy(
+            id = FocusSessionId("fs-old"),
+            startedAt = ContractSamples.now - IosSnapshot.SCHEDULE_HISTORY - 1.minutes,
+        )
+        val snapshot = IosSnapshot.from(
+            ContractSamples.now, listOf(ContractSamples.social), listOf(ContractSamples.workHours), emptyList(),
+            scheduleSessions = listOf(old),
+        )
+        assertEquals(emptyList(), snapshot.schedules.single().sessions)
+    }
+
+    @Test
     fun theSnapshotNamesTheScheduleBehindARunningSession() {
         assertEquals("sch-work", ContractSamples.snapshot.runningSessions.single().scheduleId)
     }

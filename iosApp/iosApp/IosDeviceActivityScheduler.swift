@@ -7,36 +7,66 @@ import Shared
 /// planned end. The DeviceActivityMonitor extension starts and ends sessions when they fire.
 ///
 /// It stops Schedule and session-end activities that are no longer planned (a Schedule switched off
-/// or deleted, a session that ended) and leaves Break intervals alone (T20). An activity already
-/// registered with the same interval is left as it is, so re-planning doesn't restart it.
+/// or deleted, a session that ended) and leaves Break intervals alone (T20). A session-end interval
+/// the monitor registered for a session it started is kept while that session's record lasts
+/// (`FocalAppliedSessions`), even before the app has ingested the session: switching off or editing
+/// its Schedule then never leaves it without an end. An activity already registered with the same
+/// interval is left as it is, so re-planning doesn't restart it.
 ///
-/// iOS caps how many activities an app may monitor (reported as 20); the plan lists what matters
-/// most first, and whatever the system refuses beyond that is skipped. A refusal returns false, so
-/// the shared code registers the plan again later (on the next foreground) instead of caching it.
-///
-/// Before a plan that stops or replaces a Schedule activity gets here, the shared code ingests the
-/// sessions the monitor started, so a session running in that window has its own session-end
-/// interval in the plan.
+/// iOS caps how many activities an app may monitor (`DeviceActivityPlan.ACTIVITY_LIMIT`). Session
+/// ends come first: the plan is cut to what fits beside the activities it doesn't own (Breaks, the
+/// monitor's session ends), dropped Schedule activities are stopped before the session ends are
+/// registered, and if the system still refuses a session end, registered Schedule activities are
+/// stopped, last first, until it fits. What was dropped is logged and reported as not registered,
+/// so the shared code registers the plan again on the next foreground; the launch catch-up still
+/// starts a dropped Schedule's windows while Focal is open.
 final class IosDeviceActivityScheduler: NSObject, DeviceActivityScheduler {
     func monitor(plan: DeviceActivityPlan) -> Bool {
         let center = DeviceActivityCenter()
-        let planned = plan.names
-        let stale = center.activities.filter { activity in
+        let now = Date()
+        let schedulePrefix = DeviceActivityPlan.companion.SCHEDULE_PREFIX
+        let endPrefix = DeviceActivityPlan.companion.SESSION_END_PREFIX
+        let records = FocalAppliedSessions.all()
+        let current = center.activities
+        let ours = current.filter { $0.rawValue.hasPrefix(schedulePrefix) || $0.rawValue.hasPrefix(endPrefix) }
+        // Session ends the monitor registered for its own sessions, which the plan doesn't know yet.
+        let monitorEnds = Set(ours.filter { activity in
             let name = activity.rawValue
-            let ours = name.hasPrefix(DeviceActivityPlan.companion.SCHEDULE_PREFIX)
-                || name.hasPrefix(DeviceActivityPlan.companion.SESSION_END_PREFIX)
-            return ours && !planned.contains(name)
-        }
+            guard name.hasPrefix(endPrefix), !plan.names.contains(name) else { return false }
+            return records[String(name.dropFirst(endPrefix.count))].map { $0.plannedEnd > now } ?? false
+        }.map(\.rawValue))
+        let others = current.count - ours.count + monitorEnds.count
+        let fitted = plan.fitting(capacity: Int32(Int(DeviceActivityPlan.companion.ACTIVITY_LIMIT) - others))
+        let wanted = fitted.names
+
+        let stale = ours.filter { !wanted.contains($0.rawValue) && !monitorEnds.contains($0.rawValue) }
         if !stale.isEmpty {
             center.stopMonitoring(stale)
         }
 
-        var registeredAll = true
-        for end in plan.sessionEnds {
-            registeredAll = register(DeviceActivityName(end.name), Self.schedule(for: end), in: center) && registeredAll
+        var registeredAll = fitted.schedules.count == plan.schedules.count && fitted.sessionEnds.count == plan.sessionEnds.count
+        // Schedule activities still registered from before, lowest priority (last) first: stopped one
+        // at a time if a session end doesn't fit otherwise.
+        var evictable = fitted.schedules.reversed().map { DeviceActivityName($0.name) }.filter { center.activities.contains($0) }
+        var evicted = Set<String>()
+        for end in fitted.sessionEnds {
+            let name = DeviceActivityName(end.name)
+            var registered = register(name, Self.schedule(for: end), in: center)
+            while !registered, !evictable.isEmpty {
+                let victim = evictable.removeFirst()
+                center.stopMonitoring([victim])
+                evicted.insert(victim.rawValue)
+                registered = register(name, Self.schedule(for: end), in: center)
+            }
+            registeredAll = registered && registeredAll
         }
-        for activity in plan.schedules {
+        for activity in fitted.schedules where !evicted.contains(activity.name) {
             registeredAll = register(DeviceActivityName(activity.name), Self.schedule(for: activity), in: center) && registeredAll
+        }
+        let dropped = plan.schedules.map(\.name).filter { !wanted.contains($0) || evicted.contains($0) }
+        if !dropped.isEmpty {
+            registeredAll = false
+            NSLog("Focal: too many DeviceActivity intervals; not monitoring %@", dropped.joined(separator: ", "))
         }
         return registeredAll
     }

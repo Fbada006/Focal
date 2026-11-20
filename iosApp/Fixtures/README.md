@@ -11,4 +11,4 @@ Rules for the format:
 
 - Instants are ISO 8601 UTC with whole seconds; times of day are local `HH:mm`.
 - Readers ignore unknown fields. Unknown event `type`s are skipped.
-- A change to the shape bumps `version` and moves the fixture to `-v<N>` (the snapshot is at v2 since T31 added `scheduleId` to running sessions).
+- A change to the shape bumps `version` and moves the fixture to `-v<N>` (the snapshot is at v2 since T31 added `scheduleId` to running sessions and each Schedule's recent `sessions`).

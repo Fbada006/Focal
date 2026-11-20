@@ -28,7 +28,13 @@
       "start": "22:00",
       "end": "07:00",
       "blockListId": "bl-social",
-      "strictness": "Locked"
+      "strictness": "Locked",
+      "sessions": [
+        {
+          "startedAt": "2026-01-04T22:00:00Z",
+          "plannedEnd": "2026-01-05T07:00:00Z"
+        }
+      ]
     },
     {
       "id": "sch-work",
@@ -40,7 +46,13 @@
       "start": "09:00",
       "end": "17:30",
       "blockListId": "bl-social",
-      "strictness": "Delayed"
+      "strictness": "Delayed",
+      "sessions": [
+        {
+          "startedAt": "2026-01-05T09:00:00Z",
+          "plannedEnd": "2026-01-05T17:30:00Z"
+        }
+      ]
     }
   ],
   "runningSessions": [

@@ -27,13 +27,18 @@ final class IosBlockingEngine: NSObject, BlockingEngine {
                 breakEndsAt = nil
                 breakOver = true
             }
-            // The record first, so the DeviceActivityMonitor re-applies this set at a Break's end.
+            // The record first, so the DeviceActivityMonitor re-applies this set at a Break's end and
+            // ends the session at this planned end, not an earlier one (T31). The Schedule window the
+            // monitor started it in stays recorded too, so that window's end can still end it.
             record = FocalAppliedSession(
                 apps: Array(blocked.apps),
                 appCategories: Array(blocked.appCategories),
                 domains: Array(blocked.domains),
                 plannedEnd: Self.date(session.plannedEnd),
-                breakEndsAt: breakEndsAt
+                breakEndsAt: breakEndsAt,
+                name: session.name,
+                scheduleId: IosBlockingSupportKt.scheduleIdString(session: session),
+                scheduleActivity: record?.scheduleActivity
             )
             // Re-applying replaces what this session blocks (additions while it runs).
             FocalStore.apply(

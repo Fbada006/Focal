@@ -20,9 +20,10 @@ import kotlin.time.Instant
  * Breaks register their own intervals (`focal-break-`) and are not part of the plan. Everything
  * here is worked out in Kotlin, so the Swift side only turns it into `DeviceActivitySchedule`s.
  *
- * iOS caps how many activities an app may monitor at once (reported as 20, not documented). The
- * plan lists session ends first, since they guard sessions already running; the Swift side
- * registers in order and skips what the system refuses.
+ * iOS caps how many activities an app may monitor at once ([ACTIVITY_LIMIT], reported as 20, not
+ * documented). Session ends guard sessions already running, so they come first: [fitting] keeps
+ * them all and drops Schedule activities to make room, and the Swift side stops a dropped Schedule
+ * activity before registering the session ends.
  */
 data class DeviceActivityPlan(
     val schedules: List<ScheduleActivity>,
@@ -42,7 +43,22 @@ data class DeviceActivityPlan(
     fun replacesSchedulesOf(registered: DeviceActivityPlan?): Boolean =
         registered == null || !schedules.containsAll(registered.schedules)
 
+    /**
+     * The part of this plan that fits in [capacity] activities (what [ACTIVITY_LIMIT] leaves once
+     * Breaks and other registered activities are counted): every session end first, then Schedule
+     * activities in order until it is full. A dropped Schedule's windows aren't started while Focal
+     * is closed; the launch catch-up still starts them when Focal opens.
+     */
+    fun fitting(capacity: Int): DeviceActivityPlan {
+        val room = capacity.coerceAtLeast(0)
+        val ends = sessionEnds.take(room)
+        return DeviceActivityPlan(schedules = schedules.take(room - ends.size), sessionEnds = ends)
+    }
+
     companion object {
+        /** How many activities iOS lets an app monitor at once (reported, not documented). */
+        const val ACTIVITY_LIMIT = 20
+
         /** `focal-schedule-<weekday>-<schedule id>`; the extension's `ScheduleSessions` reads it back. */
         const val SCHEDULE_PREFIX = "focal-schedule-"
 

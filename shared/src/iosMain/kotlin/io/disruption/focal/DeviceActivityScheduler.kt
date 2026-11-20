@@ -9,8 +9,10 @@ import io.disruption.focal.core.ios.DeviceActivityPlan
  */
 interface DeviceActivityScheduler {
     /**
-     * Register [plan]. Returns false if the system refused any of it (no Screen Time access, too many
-     * activities), so Focal tries again later instead of taking the plan as registered.
+     * Register as much of [plan] as fits in the activity limit (`DeviceActivityPlan.fitting`: session
+     * ends first, Schedule activities dropped to make room). Returns false if any of it isn't
+     * registered (no Screen Time access, Schedule activities dropped or refused), so Focal tries
+     * again later instead of taking the plan as registered.
      */
     fun monitor(plan: DeviceActivityPlan): Boolean
 }

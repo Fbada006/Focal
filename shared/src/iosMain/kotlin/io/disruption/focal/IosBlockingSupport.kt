@@ -22,3 +22,10 @@ fun breakActivityName(sessionId: FocusSessionId): String = "focal-break-${sessio
 
 /** [sessionId] as the plain id the extensions see in the snapshot (`FocalEndedSessions`, T20). */
 fun sessionIdString(sessionId: FocusSessionId): String = sessionId.value
+
+/**
+ * The id of the Schedule that started [session], or null, as the extensions see it (T31): the
+ * engine records it with the session's store so the monitor never starts a second session in a
+ * window the app already started.
+ */
+fun scheduleIdString(session: FocusSession): String? = session.scheduleId?.value

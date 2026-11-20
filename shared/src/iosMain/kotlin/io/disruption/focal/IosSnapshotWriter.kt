@@ -3,6 +3,9 @@ package io.disruption.focal
 import io.disruption.focal.core.ios.DeviceActivityPlan
 import io.disruption.focal.core.ios.IosContract
 import io.disruption.focal.core.ios.IosSnapshot
+import io.disruption.focal.core.model.BlockList
+import io.disruption.focal.core.model.FocusSession
+import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
 import io.disruption.focal.core.repository.ScheduleRepository
@@ -18,6 +21,7 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.create
 import platform.Foundation.writeToFile
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 /** The snapshot the Screen Time extensions read, in the App Group container (T16). */
 const val SNAPSHOT_FILE = "snapshot.json"
@@ -58,14 +62,14 @@ class IosSnapshotWriter(
             ) { lists, allSchedules, running -> Triple(lists, allSchedules, running) }
                 .collect { (lists, allSchedules, running) ->
                     var now = clock.now()
-                    var snapshot = IosSnapshot.from(now, lists, allSchedules, running)
+                    var snapshot = snapshot(now, lists, allSchedules, running)
                     var plan = DeviceActivityPlan.from(allSchedules, running, now)
                     if (plan != registered && plan.replacesSchedulesOf(registered)) {
                         write(snapshot)
                         ingestPending()
                         now = clock.now()
                         val fresh = sessions.getRunning()
-                        snapshot = IosSnapshot.from(now, lists, allSchedules, fresh)
+                        snapshot = snapshot(now, lists, allSchedules, fresh)
                         plan = DeviceActivityPlan.from(allSchedules, fresh, now)
                     }
                     write(snapshot)
@@ -73,6 +77,22 @@ class IosSnapshotWriter(
                     if (plan != registered) register(plan)
                 }
         }
+    }
+
+    /**
+     * The snapshot, with each switched-on Schedule's recent sessions (ended ones too), so the monitor
+     * never starts a second session in a window that already had one.
+     */
+    private suspend fun snapshot(
+        now: Instant,
+        lists: List<BlockList>,
+        allSchedules: List<Schedule>,
+        running: List<FocusSession>,
+    ): IosSnapshot {
+        val recent = allSchedules.filter { it.enabled }.flatMap {
+            sessions.getStartedBySchedule(it.id, since = now - IosSnapshot.SCHEDULE_HISTORY)
+        }
+        return IosSnapshot.from(now, lists, allSchedules, running, scheduleSessions = recent)
     }
 
     /** Register the latest plan again if the system refused part of it, say before Screen Time access. */

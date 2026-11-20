@@ -6,6 +6,7 @@ import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
+import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
@@ -57,7 +58,24 @@ object ContractSamples {
         breaks = listOf(Break(now - 2.minutes, now + 3.minutes)),
     )
 
-    val snapshot = IosSnapshot.from(now, listOf(social), listOf(workHours, windDown, paused), listOf(running))
+    /** A Wind down session from the night before, ended early; its window still counts as used. */
+    private val endedEarly = FocusSession(
+        id = FocusSessionId("fs-0"),
+        blockListId = social.id,
+        name = "Wind down",
+        strictness = Strictness.Locked,
+        startedAt = Instant.parse("2026-01-04T22:00:00Z"),
+        plannedEnd = Instant.parse("2026-01-05T07:00:00Z"),
+        blocked = social.blocked,
+        scheduleId = windDown.id,
+        endedAt = Instant.parse("2026-01-04T23:00:00Z"),
+        outcome = Outcome.EndedEarly,
+    )
+
+    val snapshot = IosSnapshot.from(
+        now, listOf(social), listOf(workHours, windDown, paused), listOf(running),
+        scheduleSessions = listOf(running, endedEarly),
+    )
 
     val events = ExtensionEventLog(
         events = listOf(

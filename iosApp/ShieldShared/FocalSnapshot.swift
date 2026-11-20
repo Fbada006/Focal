@@ -44,6 +44,14 @@ struct FocalSnapshot: Decodable {
         let blockListId: String
         /// `Normal`, `Delayed` or `Locked`.
         let strictness: String
+        /// The sessions it started lately, running or ended (`SnapshotScheduleSession`). A window
+        /// one of them overlaps gets no other session.
+        let sessions: [StartedSession]?
+    }
+
+    struct StartedSession: Decodable {
+        let startedAt: Date
+        let plannedEnd: Date
     }
 
     struct BlockList: Decodable {
@@ -60,49 +68,6 @@ struct FocalSnapshot: Decodable {
     let schedules: [Schedule]
     let runningSessions: [Session]
 
-}
-
-/// Sessions the DeviceActivityMonitor started for Schedules (T31), kept in the App Group's defaults
-/// from their start until their window ends, so the Shield can describe them before the app has
-/// ingested them into the snapshot. Only the monitor writes it.
-enum FocalMonitorSessions {
-    private static let key = "monitorStartedSessions"
-
-    private static var defaults: UserDefaults? { UserDefaults(suiteName: FocalSnapshotReader.appGroup) }
-
-    private static let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
-
-    private static let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
-
-    static func all() -> [FocalSnapshot.Session] {
-        let entries = defaults?.dictionary(forKey: key) as? [String: Data] ?? [:]
-        return entries.values.compactMap { try? decoder.decode(FocalSnapshot.Session.self, from: $0) }
-    }
-
-    /// Record [session], dropping any that ended before [now] so the record stays small.
-    static func record(_ session: FocalSnapshot.Session, now: Date) {
-        guard let defaults, let data = try? encoder.encode(session) else { return }
-        var entries = defaults.dictionary(forKey: key) as? [String: Data] ?? [:]
-        entries = entries.filter { _, value in
-            (try? decoder.decode(FocalSnapshot.Session.self, from: value)).map { $0.plannedEnd > now } ?? false
-        }
-        entries[session.id] = data
-        defaults.set(entries, forKey: key)
-    }
-
-    static func remove(_ sessionId: String) {
-        guard let defaults, var entries = defaults.dictionary(forKey: key) as? [String: Data] else { return }
-        entries[sessionId] = nil
-        defaults.set(entries, forKey: key)
-    }
 }
 
 enum FocalSnapshotReader {
