@@ -36,3 +36,15 @@ fun Permission.copy(): PermissionCopy = when (this) {
         missing = "Schedules may start late: alarms are off.",
     )
 }
+
+/**
+ * The warning shown when revoking a permission blocking depends on made running Locked sessions
+ * Broken (story 41, ADR 0002), on Home and in Android's notification.
+ */
+fun brokenWarning(sessionNames: List<String>): String {
+    val which = when (sessionNames.size) {
+        1 -> "Your Locked session \"${sessionNames.single()}\" was"
+        else -> "${sessionNames.size} Locked sessions were"
+    }
+    return "$which recorded as Broken: Focal's blocking was switched off. Turn it back on so Focal can block again."
+}

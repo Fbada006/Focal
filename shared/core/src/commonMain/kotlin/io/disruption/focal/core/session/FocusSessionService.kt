@@ -14,9 +14,12 @@ import io.disruption.focal.core.schedule.ScheduleWindows
 import kotlinx.datetime.TimeZone
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
+import io.disruption.focal.core.repository.AppPreferences
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -39,6 +42,7 @@ class FocusSessionService(
     private val sessions: FocusSessionRepository,
     private val engine: BlockingEngine,
     private val clock: Clock,
+    private val preferences: AppPreferences,
     private val newId: () -> String = ::randomId,
     lock: SessionLock = SessionLock(),
 ) {
@@ -46,6 +50,25 @@ class FocusSessionService(
 
     /** Exit Countdowns in progress, by session. Held in memory: leaving the countdown cancels it. */
     private val countdowns = mutableMapOf<FocusSessionId, ExitCountdown>()
+
+    /**
+     * Sessions recorded as Broken that the user hasn't acknowledged yet, oldest first, so whichever
+     * check noticed the revocation, the UI can still warn about it (story 41). Acknowledgements are
+     * stored by session, so a warning survives Focal's process dying before Home is opened, and a
+     * device clock set back can't hide one.
+     */
+    val brokenToAcknowledge: Flow<List<FocusSession>> =
+        combine(sessions.observeAll(), preferences.acknowledgedBrokenSessions) { all, acknowledged ->
+            all.filter { it.outcome == Outcome.Broken && it.id !in acknowledged }.sortedBy { it.endedAt }
+        }
+
+    /**
+     * The user dismissed the warning that named [ids]. Only those are acknowledged: a session that
+     * became Broken after the warning was shown still gets its own.
+     */
+    suspend fun acknowledgeBroken(ids: Collection<FocusSessionId>) {
+        if (ids.isNotEmpty()) preferences.acknowledgeBrokenSessions(ids.toSet())
+    }
 
     /** Running sessions, ordered by planned end. */
     val running: Flow<List<FocusSession>> = sessions.observeRunning()
@@ -286,6 +309,16 @@ class FocusSessionService(
             .filter { it.strictness == Strictness.Locked }
             .map { finish(it, Outcome.Broken, now) }
     }
+
+    /**
+     * Check what the platform reports missing against the running sessions (ADR 0002). If a
+     * permission blocking depends on is gone, blocking was defeated from outside Focal: running
+     * Locked sessions become Broken ([markBlockingDefeated]). Platforms call this whenever they
+     * might notice a revocation: when Focal's process starts, when it comes to the foreground, and
+     * on Android when the accessibility service is unbound. Returns the sessions it broke.
+     */
+    suspend fun checkPermissions(missing: Collection<Permission>): List<FocusSession> =
+        if (missing.any { it.blockingDependsOn }) markBlockingDefeated() else emptyList()
 
     /**
      * Record every running session whose planned end has passed as Completed and lift its

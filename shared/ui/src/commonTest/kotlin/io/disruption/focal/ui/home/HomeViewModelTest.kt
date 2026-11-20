@@ -3,6 +3,7 @@ package io.disruption.focal.ui.home
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.core.session.SessionLength
 import io.disruption.focal.ui.MainDispatcherTest
 import io.disruption.focal.ui.SessionUiFixture
@@ -143,5 +144,62 @@ class HomeLockedTest : MainDispatcherTest() {
         vm.onIntent(HomeIntent.TakeBreakClicked("s1"))
 
         assertTrue(f.sessionRepository.get(io.disruption.focal.core.model.FocusSessionId("s1"))!!.isRunning)
+    }
+
+    @Test
+    fun switchingBlockingOffWhileAwayBreaksLockedSessionsAndWarns() = runTest {
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Locked)
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Normal)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
+        assertEquals(null, vm.state.value.brokenWarning)
+
+        f.permissions.granted -= Permission.AccessibilityService
+        vm.onIntent(HomeIntent.Resumed)
+
+        assertEquals(Outcome.Broken, f.sessionRepository.get(FocusSessionId("s1"))?.outcome)
+        assertEquals(listOf("s2"), vm.state.value.running.map { it.id })
+        assertEquals(listOf(Permission.AccessibilityService), vm.state.value.missingPermissions)
+        assertTrue(vm.state.value.brokenWarning!!.contains("Broken"))
+
+        vm.onIntent(HomeIntent.BrokenWarningDismissed(vm.state.value.brokenWarningSessionIds))
+        assertEquals(null, vm.state.value.brokenWarning)
+    }
+
+    @Test
+    fun dismissingTheWarningLeavesASessionBrokenSinceItWasShown() = runTest {
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Locked)
+        f.sessions.checkPermissions(listOf(Permission.AccessibilityService))
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
+        val shown = vm.state.value.brokenWarningSessionIds
+        assertEquals(listOf("s1"), shown)
+
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Locked)
+        f.sessions.checkPermissions(listOf(Permission.AccessibilityService))
+        vm.onIntent(HomeIntent.BrokenWarningDismissed(shown))
+
+        assertEquals(listOf("s2"), vm.state.value.brokenWarningSessionIds)
+    }
+
+    @Test
+    fun homeWarnsAboutASessionAnotherCheckBroke() = runTest {
+        // Android's process-start check broke the session before Home was shown.
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Locked)
+        f.sessions.checkPermissions(listOf(Permission.AccessibilityService))
+
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
+
+        assertTrue(vm.state.value.brokenWarning!!.contains("Broken"))
+    }
+
+    @Test
+    fun turningNotificationsOffDoesNotBreakALockedSession() = runTest {
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Locked)
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
+
+        f.permissions.granted -= Permission.Notifications
+        vm.onIntent(HomeIntent.Resumed)
+
+        assertEquals(listOf("s1"), vm.state.value.running.map { it.id })
+        assertEquals(null, vm.state.value.brokenWarning)
     }
 }

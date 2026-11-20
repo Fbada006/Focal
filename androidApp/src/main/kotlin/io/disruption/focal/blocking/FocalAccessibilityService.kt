@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
+import io.disruption.focal.FocalApplication
 import io.disruption.focal.MainActivity
 import io.disruption.focal.core.blocking.BlockingEngine
 import kotlinx.coroutines.CoroutineScope
@@ -79,6 +80,17 @@ class FocalAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         engine?.onForeground(null)
+    }
+
+    /**
+     * Android unbinds the service when the user switches it off in accessibility settings (or the
+     * system stops it). Blocking is gone either way, so check whether it was switched off: if so,
+     * running Locked sessions are Broken (ADR 0002, T22). Revocations while Focal's process is dead
+     * are caught when it next starts (`FocalApplication.restoreSessions`).
+     */
+    override fun onUnbind(intent: Intent?): Boolean {
+        (application as? FocalApplication)?.checkBlockingPermissions()
+        return super.onUnbind(intent)
     }
 
     override fun onDestroy() {

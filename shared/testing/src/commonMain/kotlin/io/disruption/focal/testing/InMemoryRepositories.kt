@@ -58,4 +58,10 @@ class InMemoryAppPreferences(onboardingCompleted: Boolean = false) : AppPreferen
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         this.completed.value = completed
     }
+
+    private val acknowledgedBroken = MutableStateFlow<Set<FocusSessionId>>(emptySet())
+    override val acknowledgedBrokenSessions: Flow<Set<FocusSessionId>> = acknowledgedBroken
+    override suspend fun acknowledgeBrokenSessions(ids: Set<FocusSessionId>) {
+        acknowledgedBroken.update { it + ids }
+    }
 }

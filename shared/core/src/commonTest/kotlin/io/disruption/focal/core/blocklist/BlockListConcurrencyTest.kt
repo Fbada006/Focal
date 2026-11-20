@@ -10,6 +10,7 @@ import io.disruption.focal.core.session.StartResult
 import io.disruption.focal.core.session.socialList
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.testing.FakeClock
+import io.disruption.focal.testing.InMemoryAppPreferences
 import io.disruption.focal.testing.InMemoryBlockListRepository
 import io.disruption.focal.testing.InMemoryFocusSessionRepository
 import io.disruption.focal.testing.RecordingBlockingEngine
@@ -38,7 +39,7 @@ class BlockListConcurrencyTest {
         val blockLists = YieldingBlockListRepository(InMemoryBlockListRepository(socialList))
         val sessions = InMemoryFocusSessionRepository()
         val lock = SessionLock()
-        val sessionService = FocusSessionService(blockLists, sessions, RecordingBlockingEngine(), FakeClock(), lock = lock)
+        val sessionService = FocusSessionService(blockLists, sessions, RecordingBlockingEngine(), FakeClock(), InMemoryAppPreferences(), lock = lock)
         val listService = BlockListService(blockLists, sessions, sessionService, lock = lock)
 
         // The delete checks for running sessions first; the start lands while it is still deciding.
@@ -61,7 +62,7 @@ class BlockListConcurrencyTest {
     fun quickTogglesOfDifferentAppsAllLand() = runTest {
         val blockLists = YieldingBlockListRepository(InMemoryBlockListRepository(socialList))
         val sessions = InMemoryFocusSessionRepository()
-        val sessionService = FocusSessionService(blockLists, sessions, RecordingBlockingEngine(), FakeClock())
+        val sessionService = FocusSessionService(blockLists, sessions, RecordingBlockingEngine(), FakeClock(), InMemoryAppPreferences())
         val service = BlockListService(blockLists, sessions, sessionService)
 
         val a = async { service.toggleApp(socialList.id, "com.a") }

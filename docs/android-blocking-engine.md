@@ -64,7 +64,21 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
 3. **Exact alarms**: only when the first Schedule is created.
 4. **Battery optimisation + OEM steps**: after the first session, and from a "Why did my session stop?" help entry.
 
-Missing required permissions disable starting a session and are shown with a fix-it action. A required permission revoked during a Locked session makes it Broken.
+Missing required permissions disable starting a session and are shown with a fix-it action.
+
+### Broken on revoke (T22, ADR 0002)
+
+Revoking a permission blocking depends on during a Locked session makes it Broken. On Android that is the accessibility service: without it nothing is detected or Shielded. Notifications and exact alarms are required or useful but don't defeat blocking (the foreground service runs without the notification permission), so losing them only shows the fix-it banner. The rule is `Permission.blockingDependsOn` and `FocusSessionService.checkPermissions` in `shared/core`; Normal and Delayed sessions keep running, since they could have been ended anyway.
+
+Focal checks whenever it might notice a revocation:
+
+- **The service is unbound** (`FocalAccessibilityService.onUnbind`): Android unbinds it right after the user switches it off. The check reads the setting again, so an unbind for another reason doesn't break anything.
+- **Focal's process starts** (`FocalApplication.restoreSessions`, before re-applying sessions): catches a revocation while the process was dead. The sticky foreground service brings the process back, and so does opening Focal or a reboot.
+- **Home comes to the foreground**, alongside the fix-it banner.
+
+Home warns about every Broken session whose warning the user hasn't dismissed, whichever check found it (`FocusSessionService.brokenToAcknowledge`). Dismissing acknowledges exactly the sessions the warning named, stored by session id in preferences (`acknowledgedBrokenSessions`), so a warning survives Focal's process dying before Home opens (say, with notifications off), a session broken while the warning was showing still gets its own, and a device clock set back can't hide one. The unbind and process-start paths also post a "Locked session Broken" notification that opens Home. A session that ran out before the check finds the revocation is Completed, not Broken.
+
+**Uninstalling is an accepted escape.** An uninstalled app can't detect or record its own removal, so no outcome is recorded and on-device history goes with it (ADR 0002, ADR 0003).
 
 ## 6. Play policy
 

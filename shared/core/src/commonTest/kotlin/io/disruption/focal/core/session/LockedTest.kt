@@ -2,6 +2,8 @@ package io.disruption.focal.core.session
 
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -68,6 +70,117 @@ class LockedTest {
         f.service.completeDueSessions()
 
         assertEquals(Outcome.Broken, f.stored(session).outcome)
+    }
+
+    @Test
+    fun revokingTheAccessibilityServiceBreaksRunningLockedSessions() = runTest {
+        val locked = f.startFor(1.hours, strictness = Strictness.Locked)
+        val delayed = f.startFor(1.hours, list = newsList, strictness = Strictness.Delayed)
+        f.clock.advanceBy(10.minutes)
+
+        val broken = f.service.checkPermissions(listOf(Permission.AccessibilityService))
+
+        assertEquals(listOf(locked.id), broken.map { it.id })
+        assertEquals(Outcome.Broken, f.stored(locked).outcome)
+        assertTrue(locked.id !in f.engine.applied)
+        assertTrue(f.stored(delayed).isRunning)
+    }
+
+    @Test
+    fun brokenSessionsWaitToBeAcknowledged() = runTest {
+        val locked = f.startFor(1.hours, strictness = Strictness.Locked)
+        assertTrue(f.service.brokenToAcknowledge.first().isEmpty())
+
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+        assertEquals(listOf(locked.id), f.service.brokenToAcknowledge.first().map { it.id })
+
+        f.service.acknowledgeBroken(listOf(locked.id))
+        assertTrue(f.service.brokenToAcknowledge.first().isEmpty())
+    }
+
+    @Test
+    fun anUnacknowledgedWarningSurvivesAProcessRestart() = runTest {
+        // Notifications off, and Focal's process dies after recording Broken but before Home opens.
+        val locked = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+
+        val restarted = f.newService()
+        assertEquals(listOf(locked.id), restarted.brokenToAcknowledge.first().map { it.id })
+
+        restarted.acknowledgeBroken(listOf(locked.id))
+        assertTrue(f.newService().brokenToAcknowledge.first().isEmpty())
+    }
+
+    @Test
+    fun aSessionBrokenAfterTheLastDismissalIsWarnedAbout() = runTest {
+        val first = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+        f.service.acknowledgeBroken(listOf(first.id))
+        f.clock.advanceBy(1.minutes)
+
+        val second = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.ScreenTime))
+
+        assertEquals(listOf(second.id), f.service.brokenToAcknowledge.first().map { it.id })
+    }
+
+    @Test
+    fun dismissingAWarningOnlyAcknowledgesTheSessionsItNamed() = runTest {
+        val shown = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+        val displayed = f.service.brokenToAcknowledge.first().map { it.id }
+
+        // Another session becomes Broken after Home rendered the warning, before OK is tapped.
+        val unseen = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+        f.service.acknowledgeBroken(displayed)
+
+        assertEquals(listOf(shown.id), displayed)
+        assertEquals(listOf(unseen.id), f.service.brokenToAcknowledge.first().map { it.id })
+    }
+
+    @Test
+    fun aClockSetBackDoesNotHideALaterBrokenSession() = runTest {
+        val first = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+        f.service.acknowledgeBroken(listOf(first.id))
+
+        // The device clock is set back 20 minutes, then another Locked session breaks.
+        f.clock.advanceBy((-20).minutes)
+        val second = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+
+        assertEquals(listOf(second.id), f.service.brokenToAcknowledge.first().map { it.id })
+        assertEquals(listOf(second.id), f.newService().brokenToAcknowledge.first().map { it.id }, "after a restart too")
+    }
+
+    @Test
+    fun revokingScreenTimeBreaksRunningLockedSessions() = runTest {
+        val locked = f.startFor(1.hours, strictness = Strictness.Locked)
+
+        f.service.checkPermissions(listOf(Permission.ScreenTime))
+
+        assertEquals(Outcome.Broken, f.stored(locked).outcome)
+    }
+
+    @Test
+    fun missingPermissionsBlockingDoesNotDependOnLeaveLockedSessionsRunning() = runTest {
+        val locked = f.startFor(1.hours, strictness = Strictness.Locked)
+
+        assertTrue(f.service.checkPermissions(emptyList()).isEmpty())
+        assertTrue(f.service.checkPermissions(listOf(Permission.Notifications, Permission.ExactAlarms)).isEmpty())
+        assertTrue(f.stored(locked).isRunning)
+        assertTrue(locked.id in f.engine.applied)
+    }
+
+    @Test
+    fun aRevocationFoundAfterTheSessionRanOutCompletesIt() = runTest {
+        // Focal's process was dead past the planned end; the check on next start finds it revoked.
+        val locked = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.clock.advanceBy(3.hours)
+
+        assertTrue(f.service.checkPermissions(listOf(Permission.AccessibilityService)).isEmpty())
+        assertEquals(Outcome.Completed, f.stored(locked).outcome)
     }
 
     @Test

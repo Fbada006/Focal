@@ -27,11 +27,11 @@ class SessionUiFixture(vararg lists: BlockList = arrayOf(social, empty)) {
     val blockListRepository = InMemoryBlockListRepository(*lists)
     val sessionRepository = InMemoryFocusSessionRepository()
     val engine = RecordingBlockingEngine()
+    val preferences = InMemoryAppPreferences()
     private var ids = 0
-    val sessions = FocusSessionService(blockListRepository, sessionRepository, engine, clock, newId = { "s${++ids}" })
+    val sessions = FocusSessionService(blockListRepository, sessionRepository, engine, clock, preferences, newId = { "s${++ids}" })
     val scheduleRepository = InMemoryScheduleRepository()
     val blockLists = BlockListService(blockListRepository, sessionRepository, sessions, schedules = scheduleRepository)
     val permissions = FakePermissionGateway(granted = Permission.entries.toSet())
-    val preferences = InMemoryAppPreferences()
     val schedules = ScheduleService(scheduleRepository, blockListRepository, sessions, zone, newId = { "sch" })
 }

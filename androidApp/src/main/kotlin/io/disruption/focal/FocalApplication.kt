@@ -2,6 +2,8 @@ package io.disruption.focal
 
 import android.app.Application
 import io.disruption.focal.blocking.AndroidBlockingEngine
+import io.disruption.focal.blocking.BrokenSessionNotifier
+import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.ui.di.androidUiModule
 import io.disruption.focal.ui.permissions.AndroidPermissionGateway
@@ -33,13 +35,15 @@ class FocalApplication : Application() {
 
     /**
      * Complete sessions that ran out while Focal wasn't running and re-apply the rest (T13). Called
-     * on every process start, including one started by the boot receiver.
+     * on every process start, including one started by the boot receiver. A Locked session whose
+     * blocking permission was revoked while the process was dead is recorded as Broken first (T22).
      */
     fun restoreSessions(): Job? {
         if (!::koin.isInitialized) return null
         // The boot receiver lands right after onCreate; join the restore already in flight.
         restoreJob?.takeIf { it.isActive }?.let { return it }
         return scope.launch {
+            runCatching { breakIfBlockingRevoked() }
             runCatching { koin.get<FocusSessionService>().restore() }
         }.also { restoreJob = it }
     }
@@ -47,5 +51,20 @@ class FocalApplication : Application() {
     /** Wait for the restore started at process start, without starting another. */
     suspend fun awaitRestore() {
         restoreJob?.join()
+    }
+
+    /**
+     * Check whether a permission blocking depends on was revoked, for example when the accessibility
+     * service is unbound, and record running Locked sessions as Broken if so (ADR 0002, T22).
+     */
+    fun checkBlockingPermissions(): Job? {
+        if (!::koin.isInitialized) return null
+        return scope.launch { runCatching { breakIfBlockingRevoked() } }
+    }
+
+    private suspend fun breakIfBlockingRevoked() {
+        val missing = koin.get<PermissionGateway>().missing()
+        val broken = koin.get<FocusSessionService>().checkPermissions(missing)
+        if (broken.isNotEmpty()) BrokenSessionNotifier.notify(this, broken)
     }
 }
