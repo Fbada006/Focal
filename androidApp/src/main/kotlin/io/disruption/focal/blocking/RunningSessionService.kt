@@ -102,20 +102,26 @@ class RunningSessionService : Service() {
     private fun sessionService(): FocusSessionService = GlobalContext.get().get()
 
     private fun buildNotification(sessions: List<FocusSession>, now: Instant): Notification {
-        val holding = sessions.minByOrNull { it.plannedEnd }
-        val others = sessions.size - 1
-        val breakEnd = holding?.currentBreak(now)?.endsAt
+        // Which session to describe, and whether it is on a Break, is BlockingState's rule (T19).
+        val summary = BlockingState(sessions).summary(now)
+        val holding = summary?.session
+        val others = summary?.otherSessions ?: 0
         val title = when {
             holding == null -> "Focus Session"
-            others > 0 -> "${sessions.size} Focus Sessions"
+            others > 0 -> "${others + 1} Focus Sessions"
             else -> holding.name
         }
+        // With several sessions, say which one the times belong to.
+        val subject = if (holding != null && others > 0) "${holding.name}: " else ""
         val more = if (others > 0) " (+$others more)" else ""
+        val breakEnd = summary?.breakEndsAt
         val text = when {
             holding == null -> "Blocking until the session ends"
             // The Break lifts this session's blocking only; it ends on its own (T19, story 36).
-            breakEnd != null -> "On a Break until ${clockTime(breakEnd)}, then blocking until ${clockTime(holding.plannedEnd)}$more"
-            else -> "Blocking until ${clockTime(holding.plannedEnd)}$more"
+            breakEnd != null && summary.resumesAfterBreak ->
+                "${subject}On a Break until ${clockTime(breakEnd)}, then blocking until ${clockTime(holding.plannedEnd)}$more"
+            breakEnd != null -> "${subject}On a Break until the session ends at ${clockTime(holding.plannedEnd)}$more"
+            else -> "${subject}Blocking until ${clockTime(holding.plannedEnd)}$more"
         }
         val open = PendingIntent.getActivity(
             this,

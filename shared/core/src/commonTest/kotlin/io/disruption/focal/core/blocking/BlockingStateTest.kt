@@ -5,6 +5,7 @@ import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
+import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.Strictness
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -128,6 +129,58 @@ class BlockingStateTest {
     @Test
     fun thereIsNoNextChangeWhenNothingRuns() {
         assertNull(BlockingState(emptyList()).nextChange(now))
-        assertNull(BlockingState(listOf(session("s1", endIn = -1.minutes))).nextChange(now))
+        assertNull(BlockingState(listOf(session("s1", endIn = -1.minutes).copy(outcome = Outcome.Completed))).nextChange(now))
+    }
+
+    @Test
+    fun anOverduePlannedEndComesBeforeAnyFutureChange() {
+        val overdue = session("s1", endIn = -1.minutes)
+        val onBreak = session(
+            "s2",
+            endIn = 30.minutes,
+            breaks = listOf(Break(startedAt = now - 1.minutes, endsAt = now + 4.minutes)),
+        )
+
+        assertEquals(now - 1.minutes, BlockingState(listOf(onBreak, overdue)).nextChange(now))
+        assertEquals(now - 1.minutes, BlockingState(listOf(overdue)).nextChange(now))
+    }
+
+    @Test
+    fun theSummaryDescribesABlockingSessionBeforeOneOnABreak() {
+        val onBreak = session(
+            "s1",
+            endIn = 10.minutes,
+            breaks = listOf(Break(startedAt = now - 1.minutes, endsAt = now + 4.minutes)),
+        )
+        val blocking = session("s2", endIn = 30.minutes)
+
+        val summary = BlockingState(listOf(onBreak, blocking)).summary(now)
+
+        assertEquals("s2", summary?.session?.id?.value)
+        assertNull(summary?.breakEndsAt)
+        assertEquals(1, summary?.otherSessions)
+    }
+
+    @Test
+    fun whenAllAreOnABreakTheSummaryNamesTheOneThatResumesFirst() {
+        val later = session("s1", endIn = 10.minutes, breaks = listOf(Break(startedAt = now - 1.minutes, endsAt = now + 4.minutes)))
+        val sooner = session("s2", endIn = 30.minutes, breaks = listOf(Break(startedAt = now - 3.minutes, endsAt = now + 2.minutes)))
+
+        val summary = BlockingState(listOf(later, sooner)).summary(now)
+
+        assertEquals("s2", summary?.session?.id?.value)
+        assertEquals(now + 2.minutes, summary?.breakEndsAt)
+        assertEquals(true, summary?.resumesAfterBreak)
+    }
+
+    @Test
+    fun aBreakThatRunsToTheSessionsEndDoesNotResumeBlocking() {
+        val endsOnBreak = session("s1", endIn = 3.minutes, breaks = listOf(Break(startedAt = now - 2.minutes, endsAt = now + 3.minutes)))
+
+        val summary = BlockingState(listOf(endsOnBreak)).summary(now)
+
+        assertEquals(now + 3.minutes, summary?.breakEndsAt)
+        assertEquals(false, summary?.resumesAfterBreak)
+        assertNull(BlockingState(emptyList()).summary(now))
     }
 }
