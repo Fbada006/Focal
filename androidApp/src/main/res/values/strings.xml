@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">Focal</string>
     <string name="accessibility_service_label">Focal app blocking</string>
-    <string name="accessibility_service_description">Focal uses this to notice which app is in the foreground and show the Shield over apps blocked by a running Focus Session. It does not read what is on screen.</string>
+    <string name="accessibility_service_description">Focal uses this to notice which app is in the foreground and show the Shield over apps and websites blocked by a running Focus Session. In supported browsers it reads only the address bar, to see which website is open. Nothing leaves your device.</string>
 </resources>
