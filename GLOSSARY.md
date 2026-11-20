@@ -50,6 +50,10 @@ _Avoid_: Pause, snooze, unlock
 A Strictness under which the Focus Session cannot be ended, shortened or otherwise weakened until it runs out. It can still be made stricter.
 _Avoid_: Deep Focus, hardcore
 
+**Uninstall Protection**:
+On iOS, while any Locked Focus Session runs, Focal can't be deleted. It turns off when the last Locked session ends. Android has no equivalent; uninstalling there is an accepted escape that records no outcome.
+_Avoid_: Delete lock, app lock
+
 **Schedule**:
 A named, recurring rule that automatically starts a Focus Session on chosen days of the week, from a start time to an end time (an end before the start means overnight), using one Block List and one Strictness. A Schedule can be switched on or off.
 _Avoid_: Routine, automation, recurring session

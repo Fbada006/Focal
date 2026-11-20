@@ -36,6 +36,13 @@ data class FocusSession(
 
     val breaksLeft: Int get() = (MAX_BREAKS - breaks.size).coerceAtLeast(0)
 
+    /**
+     * Whether Focal can't be deleted while this session runs (story 40). Only Locked sessions have
+     * Uninstall Protection, and only iOS can enforce it; on Android uninstalling is an accepted
+     * escape (ADR 0002).
+     */
+    val hasUninstallProtection: Boolean get() = strictness == Strictness.Locked
+
     companion object {
         /** Fixed in v1: a Break lasts 5 minutes and a session allows at most three. */
         val BREAK_LENGTH: Duration = Duration.parse("5m")

@@ -14,8 +14,10 @@ final class ScreenTimePermissionGateway: NSObject, PermissionGateway {
     func isGranted(permission: Permission, completionHandler: @escaping (KotlinBoolean?, Error?) -> Void) {
         switch permission.name {
         case Permission.screentime.name:
-            let approved = AuthorizationCenter.shared.authorizationStatus == .approved
-            completionHandler(KotlinBoolean(bool: approved), nil)
+            Task {
+                let approved = await Self.screenTimeApproved()
+                completionHandler(KotlinBoolean(bool: approved), nil)
+            }
         case Permission.notifications.name:
             UNUserNotificationCenter.current().getNotificationSettings { settings in
                 let granted = settings.authorizationStatus == .authorized
@@ -26,6 +28,18 @@ final class ScreenTimePermissionGateway: NSObject, PermissionGateway {
         default:
             completionHandler(KotlinBoolean(bool: true), nil)
         }
+    }
+
+    /// Right after launch the status can read `.notDetermined` until the system has loaded it. A
+    /// revoked Screen Time access makes running Locked sessions Broken (T23), so give it a moment
+    /// to settle before reporting it missing.
+    private static func screenTimeApproved() async -> Bool {
+        for _ in 0..<5 {
+            let status = AuthorizationCenter.shared.authorizationStatus
+            if status != .notDetermined { return status == .approved }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        return false
     }
 
     func request(permission: Permission) {

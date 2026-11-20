@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -181,6 +182,22 @@ class LockedTest {
 
         assertTrue(f.service.checkPermissions(listOf(Permission.AccessibilityService)).isEmpty())
         assertEquals(Outcome.Completed, f.stored(locked).outcome)
+    }
+
+    @Test
+    fun onlyLockedSessionsHaveUninstallProtection() = runTest {
+        assertTrue(f.startFor(1.hours, strictness = Strictness.Locked).hasUninstallProtection)
+        assertFalse(f.startFor(1.hours, list = newsList, strictness = Strictness.Delayed).hasUninstallProtection)
+        assertFalse(f.startFor(1.hours, list = newsList, strictness = Strictness.Normal).hasUninstallProtection)
+    }
+
+    @Test
+    fun raisingADelayedSessionToLockedTurnsOnUninstallProtection() = runTest {
+        val session = f.startFor(1.hours, strictness = Strictness.Delayed)
+
+        f.service.edit(session.id, strictness = Strictness.Locked)
+
+        assertTrue(f.engine.applied.getValue(session.id).hasUninstallProtection)
     }
 
     @Test
