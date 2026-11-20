@@ -13,24 +13,19 @@ import Shared
 final class IosBlockingEngine: NSObject, BlockingEngine {
     func apply(session: FocusSession, completionHandler: @escaping (Error?) -> Void) {
         let store = Self.store(named: IosBlockingSupportKt.managedSettingsStoreName(session: session))
-        // Re-applying replaces what this session blocks (additions while it runs).
-        store.clearAllSettings()
-
         let blocked = session.blocked
         let apps: Set<ApplicationToken> = Self.decode(blocked.apps)
-        if !apps.isEmpty {
-            store.shield.applications = apps
-        }
         let categories: Set<ActivityCategoryToken> = Self.decode(blocked.appCategories)
-        if !categories.isEmpty {
-            store.shield.applicationCategories = .specific(categories)
-        }
         // Focal's websites are typed domains, not picker tokens, so they can't use `shield.webDomains`.
         // Safari's content filter blocks them with the system's own page instead of Focal's Shield.
         let domains = Set(blocked.domains.map { WebDomain(domain: $0) })
-        if !domains.isEmpty {
-            store.webContent.blockedByFilter = .specific(domains)
-        }
+
+        // Re-applying replaces what this session blocks (additions while it runs). Set each field
+        // straight to its new value, never clear first: clearing would briefly unblock what the
+        // session still blocks, which a Delayed or Locked session must never do.
+        store.shield.applications = apps.isEmpty ? nil : apps
+        store.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories)
+        store.webContent.blockedByFilter = domains.isEmpty ? nil : .specific(domains)
         completionHandler(nil)
     }
 
