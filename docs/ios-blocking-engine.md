@@ -10,3 +10,9 @@ Minimum deployment target: **iOS 17**. iOS 16 is the floor for individual (self)
 - **Named store cap.** Each running Focus Session gets its own named `ManagedSettingsStore` (ADR 0006); Apple caps how many an app may use. Confirm the limit.
 - **"Open Focal" from the Shield.** A ShieldAction extension cannot open the containing app directly; it can only close the Shield or run code in the background. "Open Focal" will most likely post a local notification the user taps to open Focal. Prototype and decide whether that friction is acceptable.
 - **Schedule-started sessions begin in the DeviceActivityMonitor extension.** The extension must write the session record (start, Block List, Strictness) to App Group storage so Focal sees it on next launch, and stats/Streak are computed from it.
+
+## Picking apps (T15)
+
+- The Apps tab presents `FamilyActivityPicker` and stores the serialised `ApplicationToken`s and `ActivityCategoryToken`s on the Block List. It asks for Screen Time authorization first, since onboarding lets the user skip it.
+- The selection uses `includeEntireCategory: true`, so a picked App Category stays a category token and covers apps installed later.
+- Websites are not picked here. A Block List keeps websites as typed domains in the Websites tab on both platforms, so the picker's web-domain tokens have nowhere to go. The picker can't hide its websites section, so the sheet says so in its footer and won't save while websites are selected.

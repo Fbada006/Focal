@@ -48,7 +48,11 @@ fun IosAppsTab(
             },
             style = MaterialTheme.typography.bodyMedium,
         )
-        Button(onClick = { IosScreenTimeBridge.present(blockListId, state.apps, state.appCategories) }) {
+        // Until the saved Block List has loaded, the picker would start empty and Done would wipe it.
+        Button(
+            onClick = { IosScreenTimeBridge.present(blockListId, state.apps, state.appCategories) },
+            enabled = !state.loading,
+        ) {
             Text("Choose apps and categories")
         }
         Text(
