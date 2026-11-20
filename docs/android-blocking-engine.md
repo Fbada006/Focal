@@ -8,7 +8,8 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
 
 - **Apps**: an `AccessibilityService` listening for `TYPE_WINDOW_STATE_CHANGED`. The event carries the package name, arrives instantly, and costs nothing when nothing changes.
 - Keep the service config narrow: only the event types we need.
-- Ignore noise packages that also fire window events: Focal itself, the launcher, System UI, the keyboard (IME).
+- Handle noise packages that also fire window events. Focal itself and the launcher mean the user left the app, so the Shield lifts; only a Focal Activity counts as "came to Focal", and events from Focal's own Shield window are ignored so the Shield doesn't hide itself. System UI (shade, dialogs) and the keyboard (IME) open over the app without leaving it, so they are ignored and the app underneath stays the foreground app (a Break ending while the user types still finds it).
+- Never Shield Settings, the permission controller or the package installer (AOSP, Google and the device's resolved Settings/uninstall handlers), even if a Block List picks them (ADR 0002).
 - **Websites**: same service, with `canRetrieveWindowContent` enabled, reading the address bar of supported browsers via a per-browser lookup table (package name → address-bar view ID).
   - `canRetrieveWindowContent` only grants access to the view tree; it doesn't decide *when* we look. Following a link, switching tabs or typing a new URL happens inside the same browser window and need not fire `TYPE_WINDOW_STATE_CHANGED`.
   - So for supported browser packages, also listen for `TYPE_WINDOW_CONTENT_CHANGED` and `TYPE_VIEW_TEXT_CHANGED`, and re-check the address bar on each. Scope these to the browser packages (via `packageNames` or an early filter) and debounce them, since content-change events are frequent.
@@ -32,6 +33,7 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
 - For blocks that shouldn't be dismissible, also call `performGlobalAction(GLOBAL_ACTION_HOME)` so the blocked app isn't left running underneath.
 - A Compose overlay outside an Activity needs a `LifecycleOwner` and `SavedStateRegistryOwner` attached to the `ComposeView` by hand.
 - Measure **time-to-Shield** per device to know whether it works.
+- What is blocked changes on its own when a Break ends and at a session's planned end, with no new foreground event. The engine refreshes the Shield at both moments itself (waiting on the wall clock, so a clock set back doesn't wake it early), so it reappears after a Break and lifts at the planned end even if the foreground service could not start.
 
 ## 3. Stay alive
 
