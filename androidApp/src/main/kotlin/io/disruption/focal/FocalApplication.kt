@@ -5,10 +5,12 @@ import io.disruption.focal.blocking.AndroidBlockingEngine
 import io.disruption.focal.blocking.BrokenSessionNotifier
 import io.disruption.focal.blocking.ScheduleAlarms
 import io.disruption.focal.core.permissions.PermissionGateway
+import io.disruption.focal.core.repository.FocusSessionRepository
 import io.disruption.focal.core.schedule.ScheduleService
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.ui.di.androidUiModule
 import io.disruption.focal.ui.permissions.AndroidPermissionGateway
+import io.disruption.focal.widget.StatsWidgetUpdates
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,6 +46,7 @@ class FocalApplication : Application() {
         }.koin
         restoreSessions()
         keepScheduleAlarmArmed()
+        StatsWidgetUpdates.follow(this, koin.get<FocusSessionRepository>(), scope)
     }
 
     /**

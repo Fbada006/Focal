@@ -1,6 +1,7 @@
 package io.disruption.focal.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
@@ -38,12 +39,41 @@ class PlatformContent(
     val appsTab: AppsTabContent? = null,
 )
 
+/** A screen something outside Focal asks it to open, such as the Android home-screen widget. */
+enum class EntryScreen { Stats }
+
+/**
+ * [entry], when set, is opened on top of Home once navigation is ready, then reported through
+ * [onEntryHandled] so the caller can clear it. Before onboarding is completed it is dropped. Back
+ * from it returns to Home.
+ */
 @Composable
-fun App(platform: PlatformContent = PlatformContent(), root: RootViewModel = koinViewModel()) {
+fun App(
+    platform: PlatformContent = PlatformContent(),
+    entry: EntryScreen? = null,
+    onEntryHandled: () -> Unit = {},
+    root: RootViewModel = koinViewModel(),
+) {
     FocalTheme {
         val onboardingCompleted by root.onboardingCompleted.collectAsStateWithLifecycle()
         val completed = onboardingCompleted ?: return@FocalTheme
         val nav = rememberNavController()
+        LaunchedEffect(entry) {
+            if (entry == null) return@LaunchedEffect
+            // Home is on the back stack once onboarding is completed, including when it was
+            // completed in this activity after `completed` was read.
+            val onboarded = runCatching { nav.getBackStackEntry<Home>() }.isSuccess
+            if (onboarded) {
+                when (entry) {
+                    // Back from the entry screen returns to Home, whatever was open before.
+                    EntryScreen.Stats -> nav.navigate(Stats) {
+                        popUpTo<Home>()
+                        launchSingleTop = true
+                    }
+                }
+            }
+            onEntryHandled()
+        }
         NavHost(navController = nav, startDestination = if (completed) Home else Onboarding) {
             composable<Onboarding> {
                 OnboardingRoute(
