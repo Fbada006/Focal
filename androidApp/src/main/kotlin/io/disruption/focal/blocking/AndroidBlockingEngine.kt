@@ -42,7 +42,7 @@ class AndroidBlockingEngine(
     private val categories: AppCategoryResolver = AppCategoryResolver(CuratedAppCategories.byPackage),
 ) : BlockingEngine {
     private val applied = MutableStateFlow<Map<FocusSessionId, FocusSession>>(emptyMap())
-    private val foreground = MutableStateFlow<String?>(null)
+    private val foreground = MutableStateFlow<Foreground?>(null)
     private val _shield = MutableStateFlow<ShieldContent?>(null)
 
     /**
@@ -69,9 +69,15 @@ class AndroidBlockingEngine(
     /** What the Shield should show over the current foreground app, or null to hide it. */
     val shield: StateFlow<ShieldContent?> = _shield.asStateFlow()
 
-    /** The accessibility service reports each foreground package; null means "left the app". */
-    fun onForeground(packageName: String?) {
-        foreground.value = packageName
+    /** The foreground app the Shield covers right now, or null when nothing is Shielded. */
+    val shieldedApp: String? get() = synchronized(shieldLock) { foreground.value?.packageName?.takeIf { _shield.value != null } }
+
+    /**
+     * The accessibility service reports each foreground package; null means "left the app". For a
+     * supported browser, [host] is the committed site its address bar shows, if any (T26).
+     */
+    fun onForeground(packageName: String?, host: String? = null) {
+        foreground.value = packageName?.let { Foreground(it, host) }
         refreshShield()
     }
 
@@ -104,13 +110,12 @@ class AndroidBlockingEngine(
     }
 
     private fun refreshShield() = synchronized(shieldLock) {
-        val packageName = foreground.value
-        _shield.value = packageName?.let {
-            BlockingState(applied.value.values.toList()).forApp(
-                packageName = it,
-                category = categoryOf(it),
-                now = clock.now(),
-            )
+        val current = foreground.value
+        _shield.value = current?.let {
+            val state = BlockingState(applied.value.values.toList())
+            val now = clock.now()
+            state.forApp(packageName = it.packageName, category = categoryOf(it.packageName), now = now)
+                ?: it.host?.let { host -> state.forWebsite(host, now) }
         }
     }
 
@@ -151,6 +156,9 @@ class AndroidBlockingEngine(
         runCatching { context.stopService(Intent(context, RunningSessionService::class.java)) }
     }
 }
+
+/** The foreground app and, in a supported browser, the site it shows. */
+private data class Foreground(val packageName: String, val host: String?)
 
 /**
  * The package names that are never Shielded, even if a Block List picks them. Two kinds:

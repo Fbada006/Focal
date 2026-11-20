@@ -14,6 +14,33 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
   - `canRetrieveWindowContent` only grants access to the view tree; it doesn't decide *when* we look. Following a link, switching tabs or typing a new URL happens inside the same browser window and need not fire `TYPE_WINDOW_STATE_CHANGED`.
   - So for supported browser packages, also listen for `TYPE_WINDOW_CONTENT_CHANGED` and `TYPE_VIEW_TEXT_CHANGED`, and re-check the address bar on each. Scope these to the browser packages (via `packageNames` or an early filter) and debounce them, since content-change events are frequent.
   - Only act on the committed URL, not partial text while the user is typing in the address bar (e.g. check when the bar loses focus or the page's content changes).
+
+### Websites (T26)
+
+- `FocalAccessibilityService` listens for `TYPE_WINDOW_STATE_CHANGED`, `TYPE_WINDOW_CONTENT_CHANGED` and `TYPE_VIEW_TEXT_CHANGED` with `canRetrieveWindowContent` and `flagReportViewIds`. `packageNames` stays unset because app detection needs every package; content and text events from anything but a supported browser are dropped on arrival.
+- A browser coming to the foreground is checked at once and again after 250 ms, once its views are laid out. Content and text changes schedule a check at most every 250 ms (a throttle, so a page that changes constantly still gets checked). A check only runs while that browser is the foreground app: the service reads the app window in front from the interactive windows (`flagRetrieveInteractiveWindows`), looking underneath its own Shield overlay. A browser event that arrives while another app is in front is ignored, so a late event can't replace the app really in front (or its Shield). When no app window can be read yet, the browser is taken at its word unless another app is Shielded; then that Shield stays and the browser is checked again shortly (`BrowserWindow` in shared/core). A background browser's events can't replace the pending check of the browser in front (`PendingAddressBarCheck`). Leaving the browser (another app, the launcher, Settings, Focal) forgets its site and pending check, so coming back never reuses the previous visit's site.
+- `CommittedSite` (`shared/core`) decides which site counts: text in a focused bar is the user typing and is ignored; a bar that isn't on screen (scrolled away, full-screen video, Firefox's separate edit view) keeps the last committed site; text that isn't a hostname (search terms, `about:blank`, an empty new tab) means no website. Hostnames come from `Domains`, so matching is the Block List's (T8).
+- The engine checks the app first, then the site: `BlockingState.forApp`, then `forWebsite`, over the union of running sessions. The Shield, Close and Open Focal are the same as for apps.
+
+Supported browsers (`SupportedBrowsers` in `shared/core`; a new browser or renamed view is a change there only):
+
+| Browser | Package | Address-bar view ID |
+| --- | --- | --- |
+| Chrome (stable, Beta, Dev, Canary) | `com.android.chrome`, `com.chrome.beta`, `com.chrome.dev`, `com.chrome.canary` | `<package>:id/url_bar` |
+| Microsoft Edge | `com.microsoft.emmx` | `com.microsoft.emmx:id/url_bar` |
+| Brave | `com.brave.browser` | `com.brave.browser:id/url_bar` |
+| Vivaldi | `com.vivaldi.browser` | `com.vivaldi.browser:id/url_bar` |
+| Kiwi | `com.kiwibrowser.browser` | `com.kiwibrowser.browser:id/url_bar` |
+| Samsung Internet | `com.sec.android.app.sbrowser` | `…:id/location_bar_edit_text`, then `…:id/custom_tab_toolbar_url_bar_text` |
+| Firefox (stable, Beta, Nightly) | `org.mozilla.firefox`, `org.mozilla.firefox_beta`, `org.mozilla.fenix` | `<package>:id/mozac_browser_toolbar_url_view` |
+| Opera | `com.opera.browser` | `com.opera.browser:id/url_field` |
+| DuckDuckGo | `com.duckduckgo.mobile.android` | `com.duckduckgo.mobile.android:id/omnibarTextInput` |
+
+Known gaps and risks:
+
+- View IDs are browser internals and change without notice; each needs checking on a device per release. Firefox is moving its toolbar to Compose, which may drop the view ID.
+- Chrome can show search terms instead of the URL on Google results pages ("query in omnibox"), so a blocked `google.com` isn't caught there.
+- In-app browsers (a WebView inside another app) aren't covered. Custom Tabs run under the browser's package and are caught only where their toolbar uses an ID in the table (Samsung's is listed; Chrome's needs checking on a device).
 - **`UsageStatsManager`** (usage access) is *not* a blocking signal — polling `queryEvents` for `ACTIVITY_RESUMED` is too slow. Possible later uses: fallback when accessibility is off, a cross-check, and per-app screen-time stats. Not needed for v1 unless stats require it.
 
 ### App Categories
