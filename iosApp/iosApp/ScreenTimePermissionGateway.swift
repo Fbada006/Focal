@@ -39,7 +39,8 @@ final class ScreenTimePermissionGateway: NSObject, PermissionGateway {
             if status != .notDetermined { return status == .approved }
             try? await Task.sleep(nanoseconds: 200_000_000)
         }
-        return false
+        // One last read after the final wait, so a status that settled during it still counts.
+        return AuthorizationCenter.shared.authorizationStatus == .approved
     }
 
     func request(permission: Permission) {
