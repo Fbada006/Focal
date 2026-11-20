@@ -2,4 +2,9 @@
     <string name="app_name">Focal</string>
     <string name="accessibility_service_label">Focal app blocking</string>
     <string name="accessibility_service_description">Focal uses this to notice which app is in the foreground and show the Shield over apps and websites blocked by a running Focus Session. In supported browsers it reads only the address bar, to see which website is open. Nothing leaves your device.</string>
+    <string name="stats_widget_label">Focal stats</string>
+    <string name="stats_widget_description">Your focus time today and this week, and your current Streak.</string>
+    <string name="stats_widget_preview_today">Focus today\n1 h 15 min</string>
+    <string name="stats_widget_preview_week">This week\n6 h 40 min</string>
+    <string name="stats_widget_preview_streak">Streak\n4 days</string>
 </resources>

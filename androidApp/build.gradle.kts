@@ -20,6 +20,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
     implementation(libs.androidx.lifecycle.runtimeCompose)
+    implementation(libs.glance.appwidget)
+    // Glance 1.2.0 pulls WorkManager 2.7.1 (2021), which predates targetSdk 34+; use a current one.
+    implementation(libs.work.runtime)
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
