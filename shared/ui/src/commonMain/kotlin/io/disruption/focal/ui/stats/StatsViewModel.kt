@@ -5,7 +5,6 @@ import io.disruption.focal.core.repository.FocusSessionRepository
 import io.disruption.focal.core.stats.StatsCalculator
 import io.disruption.focal.core.time.TimeZoneProvider
 import io.disruption.focal.ui.mvi.MviViewModel
-import io.disruption.focal.ui.home.formatMinutes
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -13,7 +12,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 data class StatsState(
@@ -42,13 +40,13 @@ class StatsViewModel(
                 setState {
                     StatsState(
                         loading = false,
-                        focusToday = stats.focusToday.text(),
-                        focusThisWeek = stats.focusThisWeek.text(),
+                        focusToday = StatsCopy.focusTime(stats.focusToday),
+                        focusThisWeek = StatsCopy.focusTime(stats.focusThisWeek),
                         completed = stats.completed,
                         endedEarly = stats.endedEarly,
                         broken = stats.broken,
-                        currentStreak = days(stats.currentStreak),
-                        longestStreak = days(stats.longestStreak),
+                        currentStreak = StatsCopy.streak(stats.currentStreak),
+                        longestStreak = StatsCopy.streak(stats.longestStreak),
                     )
                 }
             }
@@ -56,10 +54,6 @@ class StatsViewModel(
     }
 
     override fun onIntent(intent: Nothing) = Unit
-
-    private fun Duration.text(): String = formatMinutes(inWholeMinutes.minutes)
-
-    private fun days(n: Int) = if (n == 1) "1 day" else "$n days"
 }
 
 private fun everyMinute(): Flow<Unit> = flow {
