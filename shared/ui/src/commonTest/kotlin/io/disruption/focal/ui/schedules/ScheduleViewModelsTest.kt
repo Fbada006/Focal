@@ -89,7 +89,7 @@ class ScheduleViewModelsTest : MainDispatcherTest() {
     }
 
     @Test
-    fun asksForExactAlarmsWhenANewScheduleIsSavedWithoutThem() = runTest {
+    fun asksForExactAlarmsWhenTheFirstScheduleIsSavedWithoutThem() = runTest {
         f.permissions.granted -= Permission.ExactAlarms
         val editor = ScheduleEditorViewModel(null, f.schedules, f.blockLists, f.permissions)
         editor.onIntent(ScheduleEditorIntent.NameChanged("Work"))
@@ -111,6 +111,23 @@ class ScheduleViewModelsTest : MainDispatcherTest() {
         editor.onIntent(ScheduleEditorIntent.AlarmsNotNowClicked)
 
         assertEquals(ScheduleEditorEffect.Close, editor.effects.first())
+        assertTrue(f.permissions.requested.isEmpty())
+    }
+
+    @Test
+    fun asksForAlarmsOnlyForTheFirstSchedule() = runTest {
+        f.permissions.granted -= Permission.ExactAlarms
+        val first = ScheduleEditorViewModel(null, f.schedules, f.blockLists, f.permissions)
+        first.onIntent(ScheduleEditorIntent.NameChanged("Work"))
+        first.onIntent(ScheduleEditorIntent.SaveClicked)
+        assertTrue(first.state.value.askingForAlarms)
+        first.onIntent(ScheduleEditorIntent.AlarmsNotNowClicked)
+
+        val second = ScheduleEditorViewModel(null, f.schedules, f.blockLists, f.permissions)
+        second.onIntent(ScheduleEditorIntent.NameChanged("Evening"))
+        second.onIntent(ScheduleEditorIntent.SaveClicked)
+        assertEquals(ScheduleEditorEffect.Close, second.effects.first())
+        assertFalse(second.state.value.askingForAlarms)
         assertTrue(f.permissions.requested.isEmpty())
     }
 

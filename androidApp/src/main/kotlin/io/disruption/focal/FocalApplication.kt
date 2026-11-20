@@ -16,6 +16,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.Koin
 
@@ -24,6 +26,12 @@ class FocalApplication : Application() {
     private lateinit var koin: Koin
     private var restoreJob: Job? = null
     private val alarms by lazy { ScheduleAlarms(this) }
+
+    /**
+     * Arming is compute-then-set from several paths (catch-up, Schedule and session changes). Without
+     * this, a stale wake-up computed first could be set last and replace a newer, earlier one.
+     */
+    private val armLock = Mutex()
 
     override fun onCreate() {
         super.onCreate()
@@ -74,6 +82,11 @@ class FocalApplication : Application() {
     private suspend fun catchUpAndArm() {
         val schedules = koin.get<ScheduleService>()
         schedules.catchUp()
+        armNextWakeUp(schedules)
+    }
+
+    /** Work out the next wake-up and set the alarm as one step, so the latest computation wins. */
+    private suspend fun armNextWakeUp(schedules: ScheduleService) = armLock.withLock {
         alarms.arm(schedules.nextWakeUp())
     }
 
@@ -82,7 +95,7 @@ class FocalApplication : Application() {
         val schedules = koin.get<ScheduleService>()
         scope.launch {
             combine(schedules.observeAll(), koin.get<FocusSessionService>().running) { _, _ -> }
-                .collectLatest { runCatching { alarms.arm(schedules.nextWakeUp()) } }
+                .collectLatest { runCatching { armNextWakeUp(schedules) } }
         }
     }
 

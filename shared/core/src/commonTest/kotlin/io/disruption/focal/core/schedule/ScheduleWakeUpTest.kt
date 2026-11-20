@@ -1,5 +1,6 @@
 package io.disruption.focal.core.schedule
 
+import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
@@ -66,6 +67,36 @@ class ScheduleWakeUpTest {
         service.create(tuesdayWork)
         f.service.start(socialList.id, SessionLength.For(30.minutes), Strictness.Normal)
         assertEquals(Instant.parse("2026-01-05T10:30:00Z"), service.nextWakeUp())
+    }
+
+    @Test
+    fun wakesNowForAWindowThatBeganWithoutItsSession() = runTest {
+        service.create(tuesdayWork)
+        // A catch-up ran just before 09:00; asking just after must not skip to next Tuesday.
+        f.clock.now = Instant.parse("2026-01-06T09:00:01Z")
+        assertEquals(f.clock.now, service.nextWakeUp())
+
+        service.catchUp()
+        assertEquals(Instant.parse("2026-01-06T17:00:00Z"), service.nextWakeUp())
+    }
+
+    @Test
+    fun wakesNowForASessionPastItsEnd() = runTest {
+        f.service.start(socialList.id, SessionLength.For(30.minutes), Strictness.Normal)
+        f.clock.now = Instant.parse("2026-01-05T10:30:01Z")
+        assertEquals(f.clock.now, service.nextWakeUp())
+
+        service.catchUp()
+        assertNull(service.nextWakeUp())
+    }
+
+    @Test
+    fun aWindowWithNothingToBlockDoesNotWakeNow() = runTest {
+        service.create(tuesdayWork)
+        f.blockLists.save(socialList.copy(blocked = BlockedSet()))
+        f.clock.now = Instant.parse("2026-01-06T10:00:00Z")
+        // Catch-up would start nothing, so waking now would only loop: wait for next week's start.
+        assertEquals(Instant.parse("2026-01-13T09:00:00Z"), service.nextWakeUp())
     }
 
     @Test

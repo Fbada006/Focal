@@ -58,9 +58,10 @@ sealed interface ScheduleEditorEffect {
 /**
  * Create or edit a Schedule. Saving never weakens a session it already started (ADR 0007).
  *
- * Exact alarms are asked for only here, when a new Schedule is saved without them (T30,
- * docs/android-blocking-engine.md §5): that is the first moment Focal needs them. Platforms that
- * don't need them (iOS) report them granted, so nothing is asked.
+ * Exact alarms are asked for only here, when the first Schedule is created without them (T30,
+ * docs/android-blocking-engine.md §5): that is the first moment Focal needs them. Later Schedules
+ * don't ask again, so "Not now" sticks. Platforms that don't need them (iOS) report them granted,
+ * so nothing is asked.
  */
 class ScheduleEditorViewModel(
     scheduleId: String?,
@@ -132,10 +133,11 @@ class ScheduleEditorViewModel(
             enabled = state.enabled,
         )
         viewModelScope.launch {
+            val isFirstSchedule = id == null && schedules.observeAll().first().isEmpty()
             val result = if (id == null) schedules.create(draft) else schedules.update(id, draft)
             when (result) {
                 is ScheduleSaveResult.Saved ->
-                    if (id == null && !permissions.isGranted(Permission.ExactAlarms)) setState { copy(askingForAlarms = true) }
+                    if (isFirstSchedule && !permissions.isGranted(Permission.ExactAlarms)) setState { copy(askingForAlarms = true) }
                     else emit(ScheduleEditorEffect.Close)
                 ScheduleSaveResult.NotFound -> emit(ScheduleEditorEffect.Close)
                 is ScheduleSaveResult.Invalid ->

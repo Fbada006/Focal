@@ -10,6 +10,7 @@ import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.Schedule
+import io.disruption.focal.core.schedule.ScheduleWindow
 import io.disruption.focal.core.schedule.ScheduleWindows
 import kotlinx.datetime.TimeZone
 import io.disruption.focal.core.model.ScheduleId
@@ -141,12 +142,8 @@ class FocusSessionService(
     suspend fun evaluateSchedules(schedules: List<Schedule>, zone: TimeZone): List<FocusSession> = mutex.withLock {
         val now = clock.now()
         val started = mutableListOf<FocusSession>()
-        for (schedule in schedules.filter { it.enabled }) {
-            val window = ScheduleWindows.current(schedule, now, zone) ?: continue
-            if (hasSessionInWindow(schedule.id, window.start, window.end)) continue
-            val blockList = blockLists.get(schedule.blockListId)
-            if (blockList == null || blockList.blocked.isEmpty) continue
-
+        for (schedule in schedules) {
+            val (window, blockList) = dueWindowLocked(schedule, now, zone) ?: continue
             val session = FocusSession(
                 id = FocusSessionId(newId()),
                 blockListId = blockList.id,
@@ -165,15 +162,34 @@ class FocusSessionService(
     }
 
     /**
+     * The window of [schedule] that should start a session now, with its Block List: switched on,
+     * now inside the window, no session started in it yet, and something to block. Null otherwise.
+     */
+    private suspend fun dueWindowLocked(schedule: Schedule, now: Instant, zone: TimeZone): Pair<ScheduleWindow, BlockList>? {
+        if (!schedule.enabled) return null
+        val window = ScheduleWindows.current(schedule, now, zone) ?: return null
+        if (hasSessionInWindow(schedule.id, window.start, window.end)) return null
+        val blockList = blockLists.get(schedule.blockListId)?.takeUnless { it.blocked.isEmpty } ?: return null
+        return window to blockList
+    }
+
+    /**
      * When the platform must next wake Focal to keep Schedules on time with Focal closed (T30): the
      * soonest of the next window start of a switched-on Schedule and the planned end of a running
      * session, after now. At that moment, call [completeDueSessions] and [evaluateSchedules], then
      * ask again. Null when nothing is due.
+     *
+     * Now, when something is already due that a catch-up would act on: a running session past its
+     * planned end, or a Schedule window that has begun without its session. Time passes between a
+     * catch-up and this call, so a start or end that fell in between must not be skipped.
      */
     suspend fun nextWakeUp(schedules: List<Schedule>, zone: TimeZone): Instant? = mutex.withLock {
         val now = clock.now()
+        val running = sessions.getRunning()
+        if (running.any { it.plannedEnd <= now }) return now
+        if (schedules.any { dueWindowLocked(it, now, zone) != null }) return now
         val nextStart = ScheduleWindows.nextStart(schedules, now, zone)
-        val nextEnd = sessions.getRunning().map { it.plannedEnd }.filter { it > now }.minOrNull()
+        val nextEnd = running.minOfOrNull { it.plannedEnd }
         listOfNotNull(nextStart, nextEnd).minOrNull()
     }
 
