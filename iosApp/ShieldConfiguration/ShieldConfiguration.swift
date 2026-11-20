@@ -37,7 +37,9 @@ private enum FocalShieldConfiguration {
     static func make(app: ApplicationToken?, category: ActivityCategoryToken?, domain: String?) -> ShieldConfiguration {
         let now = Date()
         let content = FocalShieldContent.make(
-            snapshot: FocalSnapshotReader.load(),
+            // Sessions applied that the snapshot doesn't list yet count too, such as Schedule
+            // sessions the monitor started before Focal has ingested them (T31).
+            snapshot: FocalSnapshotReader.load()?.withAppliedSessions(now: now),
             app: app,
             category: category,
             domain: domain,
@@ -79,5 +81,36 @@ private enum FocalShieldConfiguration {
         let rest = minutes % 60
         if hours == 0 { return "About \(minutes) min" }
         return rest == 0 ? "About \(hours) h" : "About \(hours) h \(rest) min"
+    }
+}
+
+private extension FocalSnapshot {
+    /// The running sessions plus those applied but not in the snapshot yet, from their coordinated
+    /// records (`FocalAppliedSessions`): the monitor's Schedule sessions before the app ingests them
+    /// (T31), or one the app just started. A session the snapshot lists is counted once, and one
+    /// that has ended (its record is deleted then, or `FocalEndedSessions` has it) not at all.
+    func withAppliedSessions(now: Date) -> FocalSnapshot {
+        let known = Set(runningSessions.map(\.id))
+        let pending = FocalAppliedSessions.all().compactMap { id, record -> FocalSnapshot.Session? in
+            guard !known.contains(id), let name = record.name, record.plannedEnd > now,
+                  !FocalEndedSessions.contains(id) else { return nil }
+            return FocalSnapshot.Session(
+                id: id,
+                name: name,
+                scheduleId: record.scheduleId,
+                plannedEnd: record.plannedEnd,
+                breakEndsAt: record.breakEndsAt,
+                apps: record.apps,
+                appCategories: record.appCategories,
+                domains: record.domains
+            )
+        }
+        guard !pending.isEmpty else { return self }
+        return FocalSnapshot(
+            version: version,
+            blockLists: blockLists,
+            schedules: schedules,
+            runningSessions: runningSessions + pending
+        )
     }
 }

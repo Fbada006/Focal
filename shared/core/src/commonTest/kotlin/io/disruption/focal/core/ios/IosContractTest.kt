@@ -4,13 +4,21 @@ import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
+import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.core.permissions.Permission
+import io.disruption.focal.core.schedule.ScheduleService
+import io.disruption.focal.core.time.TimeZoneProvider
+import io.disruption.focal.testing.InMemoryScheduleRepository
+import io.disruption.focal.testing.RecordingBlockingEngine
 import io.disruption.focal.core.session.BreakResult
 import io.disruption.focal.core.session.SessionTestFixture
 import io.disruption.focal.core.session.socialList
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -339,5 +347,88 @@ class IosContractTest {
 
         assertEquals(0, report.sessionsStarted)
         assertEquals(1, f.sessions.all.size)
+        // The extension's duplicate store stops blocking; the app's session holds the window (T31).
+        assertTrue(f.engine.calls.contains(RecordingBlockingEngine.Call.Lift(FocusSessionId("fs-ios"))))
+    }
+
+    @Test
+    fun theSnapshotKeepsEachSchedulesRecentSessionsEvenOnesEndedEarly() {
+        // T31: the monitor extension starts no second session in a window one of these overlaps.
+        val bySchedule = ContractSamples.snapshot.schedules.associate { it.id to it.sessions }
+        assertEquals(
+            listOf(SnapshotScheduleSession(Instant.parse("2026-01-04T22:00:00Z"), Instant.parse("2026-01-05T07:00:00Z"))),
+            bySchedule.getValue("sch-wind-down"),
+            "ended early, it still holds its window until its planned end",
+        )
+        assertEquals(listOf(ContractSamples.running.startedAt), bySchedule.getValue("sch-work").map { it.startedAt })
+    }
+
+    @Test
+    fun aScheduleSessionOlderThanTheHistoryIsLeftOut() {
+        val old = ContractSamples.running.copy(
+            id = FocusSessionId("fs-old"),
+            startedAt = ContractSamples.now - IosSnapshot.SCHEDULE_HISTORY - 1.minutes,
+        )
+        val snapshot = IosSnapshot.from(
+            ContractSamples.now, listOf(ContractSamples.social), listOf(ContractSamples.workHours), emptyList(),
+            scheduleSessions = listOf(old),
+        )
+        assertEquals(emptyList(), snapshot.schedules.single().sessions)
+    }
+
+    @Test
+    fun theSnapshotNamesTheScheduleBehindARunningSession() {
+        assertEquals("sch-work", ContractSamples.snapshot.runningSessions.single().scheduleId)
+    }
+
+    @Test
+    fun onLaunchAnOpenWindowTheMonitorMissedStartsAfterIngesting() = runTest {
+        // T31 backstop: the DeviceActivity start didn't fire, so Focal starts the window on launch.
+        val f = SessionTestFixture().apply { clock.now = Instant.parse("2026-01-05T10:00:00Z") } // Monday
+        val schedules = InMemoryScheduleRepository()
+        val service = ScheduleService(schedules, f.blockLists, f.service, TimeZoneProvider { TimeZone.UTC })
+        schedules.save(
+            Schedule(ScheduleId("sch"), "Evening", setOf(DayOfWeek.MONDAY), LocalTime(9, 0), LocalTime(17, 0), socialList.id, Strictness.Delayed),
+        )
+
+        ingestOnLaunch(f.service, null, schedules = service)
+
+        assertEquals(ScheduleId("sch"), f.sessions.getRunning().single().scheduleId)
+    }
+
+    @Test
+    fun onLaunchAWindowTheMonitorStartedIsNotStartedAgain() = runTest {
+        val f = SessionTestFixture().apply { clock.now = Instant.parse("2026-01-05T10:00:00Z") } // Monday
+        val schedules = InMemoryScheduleRepository()
+        val service = ScheduleService(schedules, f.blockLists, f.service, TimeZoneProvider { TimeZone.UTC })
+        schedules.save(
+            Schedule(ScheduleId("sch"), "Evening", setOf(DayOfWeek.MONDAY), LocalTime(9, 0), LocalTime(17, 0), socialList.id, Strictness.Delayed),
+        )
+        val log = IosContract.encodeEvents(ExtensionEventLog(events = listOf(scheduleStart(Instant.parse("2026-01-05T09:00:00Z")))))
+
+        ingestOnLaunch(f.service, log, schedules = service)
+
+        assertEquals(listOf(FocusSessionId("fs-ios")), f.sessions.getRunning().map { it.id })
+    }
+
+    @Test
+    fun onLaunchWithoutScreenTimeAccessNoScheduleSessionStartsButTheLogIsIngested() = runTest {
+        // A Locked session started now couldn't block, and would escape the Broken check before it.
+        val f = SessionTestFixture().apply { clock.now = Instant.parse("2026-01-05T10:00:00Z") } // Monday
+        val schedules = InMemoryScheduleRepository()
+        val service = ScheduleService(schedules, f.blockLists, f.service, TimeZoneProvider { TimeZone.UTC })
+        schedules.save(
+            Schedule(ScheduleId("sch-work"), "Work", setOf(DayOfWeek.MONDAY), LocalTime(9, 0), LocalTime(17, 0), socialList.id, Strictness.Locked),
+        )
+        val log = IosContract.encodeEvents(ExtensionEventLog(events = listOf(scheduleStart(Instant.parse("2026-01-05T09:30:00Z")))))
+
+        val report = ingestOnLaunch(f.service, log, missing = listOf(Permission.ScreenTime), schedules = service)
+
+        assertEquals(1, report.sessionsStarted, "what the extension did is still ingested")
+        assertEquals(listOf(FocusSessionId("fs-ios")), f.sessions.getRunning().map { it.id })
+
+        // Access is back on the next foreground: the window, still open, starts then.
+        ingestOnLaunch(f.service, log, schedules = service)
+        assertEquals(setOf(ScheduleId("sch"), ScheduleId("sch-work")), f.sessions.getRunning().map { it.scheduleId }.toSet())
     }
 }

@@ -19,7 +19,10 @@
 		288AC63D2960C328CA0DAF4F /* FocalSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C7FCB979DBCA3AE8EAE069 /* FocalSnapshot.swift */; };
 		77EB96832F2819893A35D3BB /* FocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A868F1D5FA797FA06652B70 /* FocalStore.swift */; };
 		DCD24CF5C5713225C7C04858 /* FocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A868F1D5FA797FA06652B70 /* FocalStore.swift */; };
+		C41F0C5E7B2D4E6F8A9B0C3F /* FocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A868F1D5FA797FA06652B70 /* FocalStore.swift */; };
 		9E1F67D94768D104DF4DD00F /* DeviceActivityMonitor.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = FAE5BD5B2E7AA2C68795BA41 /* DeviceActivityMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B31F0C5E7B2D4E6F8A9B0C1D /* ScheduleSessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31F0C5E7B2D4E6F8A9B0C1D /* ScheduleSessions.swift */; };
+		B31F0C5E7B2D4E6F8A9B0C2E /* SessionEnder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31F0C5E7B2D4E6F8A9B0C2E /* SessionEnder.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +77,8 @@
 		76C6D91B2A31AC36CC84C818 /* FocalEventLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocalEventLog.swift; sourceTree = "<group>"; };
 		5A868F1D5FA797FA06652B70 /* FocalStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocalStore.swift; sourceTree = "<group>"; };
 		FAE5BD5B2E7AA2C68795BA41 /* DeviceActivityMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DeviceActivityMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A31F0C5E7B2D4E6F8A9B0C1D /* ScheduleSessions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScheduleSessions.swift; sourceTree = "<group>"; };
+		A31F0C5E7B2D4E6F8A9B0C2E /* SessionEnder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionEnder.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -194,6 +199,8 @@
 				94716C04F079FB76BFC061AA /* FocalDeviceActivityMonitor.swift */,
 				48120EFB2E42342B046A0527 /* BreakResumer.swift */,
 				76C6D91B2A31AC36CC84C818 /* FocalEventLog.swift */,
+				A31F0C5E7B2D4E6F8A9B0C2E /* SessionEnder.swift */,
+				A31F0C5E7B2D4E6F8A9B0C1D /* ScheduleSessions.swift */,
 			);
 			name = DeviceActivityMonitor;
 			path = DeviceActivityMonitor;
@@ -392,6 +399,7 @@
 			files = (
 				89D0547003C2DAFEF486FC7F /* ShieldConfiguration.swift in Sources */,
 				75B85DCF353A63FB3D607F96 /* FocalSnapshot.swift in Sources */,
+				C41F0C5E7B2D4E6F8A9B0C3F /* FocalStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -402,6 +410,8 @@
 				7EEA34EDFDE3A910373A8C89 /* FocalDeviceActivityMonitor.swift in Sources */,
 				E1D93D1E70D5A4A60C484264 /* BreakResumer.swift in Sources */,
 				87E924FB41ECA1BB40416E57 /* FocalEventLog.swift in Sources */,
+				B31F0C5E7B2D4E6F8A9B0C2E /* SessionEnder.swift in Sources */,
+				B31F0C5E7B2D4E6F8A9B0C1D /* ScheduleSessions.swift in Sources */,
 				288AC63D2960C328CA0DAF4F /* FocalSnapshot.swift in Sources */,
 				77EB96832F2819893A35D3BB /* FocalStore.swift in Sources */,
 			);

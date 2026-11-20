@@ -5,6 +5,7 @@ import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.Schedule
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 /**
@@ -24,13 +25,26 @@ data class IosSnapshot(
     val runningSessions: List<SnapshotSession>,
 ) {
     companion object {
-        const val CURRENT_VERSION = 1
+        /** 2 added [SnapshotSession.scheduleId] and [SnapshotSchedule.sessions] (T31). */
+        const val CURRENT_VERSION = 2
 
+        /**
+         * How far back [SnapshotSchedule.sessions] reaches. A window open now started less than a day
+         * ago (25 hours across a DST change), and so did any session overlapping it: two days covers
+         * both, with room for a snapshot written a while before the window starts.
+         */
+        val SCHEDULE_HISTORY = 2.days
+
+        /**
+         * [scheduleSessions] are the sessions Schedules started since [SCHEDULE_HISTORY] before
+         * [generatedAt], running or finished; each goes to its Schedule's [SnapshotSchedule.sessions].
+         */
         fun from(
             generatedAt: Instant,
             blockLists: List<BlockList>,
             schedules: List<Schedule>,
             runningSessions: List<FocusSession>,
+            scheduleSessions: List<FocusSession> = emptyList(),
         ): IosSnapshot = IosSnapshot(
             generatedAt = generatedAt,
             blockLists = blockLists.sortedBy { it.id.value }.map { list ->
@@ -51,6 +65,11 @@ data class IosSnapshot(
                     end = schedule.end.toString().take(5),
                     blockListId = schedule.blockListId.value,
                     strictness = schedule.strictness.name,
+                    sessions = scheduleSessions
+                        .filter { it.scheduleId == schedule.id && it.startedAt >= generatedAt - SCHEDULE_HISTORY }
+                        .distinctBy { it.id }
+                        .sortedBy { it.startedAt }
+                        .map { SnapshotScheduleSession(startedAt = it.startedAt, plannedEnd = it.plannedEnd) },
                 )
             },
             runningSessions = runningSessions.filter { it.isRunning }.sortedBy { it.id.value }.map { session ->
@@ -58,6 +77,7 @@ data class IosSnapshot(
                     id = session.id.value,
                     name = session.name,
                     strictness = session.strictness.name,
+                    scheduleId = session.scheduleId?.value,
                     startedAt = session.startedAt,
                     plannedEnd = session.plannedEnd,
                     apps = session.blocked.apps.sorted(),
@@ -94,6 +114,21 @@ data class SnapshotSchedule(
     val blockListId: String,
     /** `Normal`, `Delayed` or `Locked`. */
     val strictness: String,
+    /**
+     * The sessions it started lately, running or finished, oldest first. A window gets at most one
+     * session (`FocusSessionService.evaluateSchedules`): the monitor extension starts none for a
+     * window one of these overlaps, even one ended early or started before the Schedule's times moved.
+     */
+    val sessions: List<SnapshotScheduleSession> = emptyList(),
+)
+
+/** When a Schedule's session started and was planned to end; it held its window until then. */
+@Serializable
+data class SnapshotScheduleSession(
+    @Serializable(IsoInstantSerializer::class)
+    val startedAt: Instant,
+    @Serializable(IsoInstantSerializer::class)
+    val plannedEnd: Instant,
 )
 
 /**
@@ -105,6 +140,11 @@ data class SnapshotSession(
     val id: String,
     val name: String,
     val strictness: String,
+    /**
+     * The Schedule that started it, if any. The monitor extension doesn't start a second session
+     * for a Schedule window the app already started (T31).
+     */
+    val scheduleId: String? = null,
     @Serializable(IsoInstantSerializer::class)
     val startedAt: Instant,
     @Serializable(IsoInstantSerializer::class)

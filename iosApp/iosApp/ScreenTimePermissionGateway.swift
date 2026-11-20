@@ -48,6 +48,11 @@ final class ScreenTimePermissionGateway: NSObject, PermissionGateway {
         case Permission.screentime.name:
             Task {
                 try? await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+                // DeviceActivity intervals refused without access are registered again now, rather
+                // than on the next foreground, which granting from inside Focal may not cause (T31).
+                if AuthorizationCenter.shared.authorizationStatus == .approved {
+                    await MainActor.run { StartFocalKt.focalDidBecomeActive() }
+                }
             }
         case Permission.notifications.name:
             // iOS asks only once; after a denial the only way back is Focal's page in Settings.

@@ -1,7 +1,11 @@
 package io.disruption.focal
 
+import io.disruption.focal.core.ios.DeviceActivityPlan
 import io.disruption.focal.core.ios.IosContract
 import io.disruption.focal.core.ios.IosSnapshot
+import io.disruption.focal.core.model.BlockList
+import io.disruption.focal.core.model.FocusSession
+import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
 import io.disruption.focal.core.repository.ScheduleRepository
@@ -17,6 +21,7 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.create
 import platform.Foundation.writeToFile
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 /** The snapshot the Screen Time extensions read, in the App Group container (T16). */
 const val SNAPSHOT_FILE = "snapshot.json"
@@ -25,24 +30,79 @@ const val SNAPSHOT_FILE = "snapshot.json"
  * Writes [IosSnapshot] to the App Group on every change to Block Lists, Schedules or running
  * sessions (T16, ADR 0008). The extensions make no decisions: they read this file, apply it, and
  * append events the app ingests on launch.
+ *
+ * After each write it hands the [DeviceActivityPlan] to [activities] when the plan changed (T31):
+ * one interval per switched-on Schedule day and one per running session's planned end. The
+ * snapshot is written first, so an interval that fires as soon as it is registered reads the
+ * snapshot it belongs to.
+ *
+ * Before a plan stops or replaces a Schedule activity, [ingestPending] ingests what the extensions
+ * recorded: a session the monitor started in that window (while Focal stayed open) then has its own
+ * session-end interval in the plan, instead of losing its only end callback. A plan the system
+ * refused in part is not taken as registered; [retry] registers it again, on each foreground.
  */
 class IosSnapshotWriter(
     private val blockLists: BlockListRepository,
     private val schedules: ScheduleRepository,
     private val sessions: FocusSessionRepository,
+    private val activities: DeviceActivityScheduler = NoDeviceActivityScheduler(),
     private val clock: Clock = Clock.System,
+    private val ingestPending: suspend () -> Unit = {},
 ) {
-    /** Start observing; the first emission writes the snapshot straight away. */
+    private var latest: DeviceActivityPlan? = null
+    private var registered: DeviceActivityPlan? = null
+
+    /** Start observing; the first emission writes the snapshot and registers the plan straight away. */
     fun start(scope: CoroutineScope) {
         scope.launch {
             combine(
                 blockLists.observeAll(),
                 schedules.observeAll(),
                 sessions.observeRunning(),
-            ) { lists, allSchedules, running ->
-                IosSnapshot.from(clock.now(), lists, allSchedules, running)
-            }.collect(::write)
+            ) { lists, allSchedules, running -> Triple(lists, allSchedules, running) }
+                .collect { (lists, allSchedules, running) ->
+                    var now = clock.now()
+                    var snapshot = snapshot(now, lists, allSchedules, running)
+                    var plan = DeviceActivityPlan.from(allSchedules, running, now)
+                    if (plan != registered && plan.replacesSchedulesOf(registered)) {
+                        write(snapshot)
+                        ingestPending()
+                        now = clock.now()
+                        val fresh = sessions.getRunning()
+                        snapshot = snapshot(now, lists, allSchedules, fresh)
+                        plan = DeviceActivityPlan.from(allSchedules, fresh, now)
+                    }
+                    write(snapshot)
+                    latest = plan
+                    if (plan != registered) register(plan)
+                }
         }
+    }
+
+    /**
+     * The snapshot, with each switched-on Schedule's recent sessions (ended ones too), so the monitor
+     * never starts a second session in a window that already had one.
+     */
+    private suspend fun snapshot(
+        now: Instant,
+        lists: List<BlockList>,
+        allSchedules: List<Schedule>,
+        running: List<FocusSession>,
+    ): IosSnapshot {
+        val recent = allSchedules.filter { it.enabled }.flatMap {
+            sessions.getStartedBySchedule(it.id, since = now - IosSnapshot.SCHEDULE_HISTORY)
+        }
+        return IosSnapshot.from(now, lists, allSchedules, running, scheduleSessions = recent)
+    }
+
+    /** Register the latest plan again if the system refused part of it, say before Screen Time access. */
+    fun retry() {
+        val plan = latest ?: return
+        if (plan != registered) register(plan)
+    }
+
+    private fun register(plan: DeviceActivityPlan) {
+        registered = if (activities.monitor(plan)) plan else null
     }
 
     /** Write [snapshot]; without the App Group entitlement there is no container and this is a no-op. */

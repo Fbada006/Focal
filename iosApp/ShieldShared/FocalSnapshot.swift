@@ -1,13 +1,15 @@
 import Foundation
 import ManagedSettings
 
-/// The part of the app's snapshot (`IosSnapshot` in shared/core, fixture `iosApp/Fixtures/snapshot-v1.json`)
-/// the Shield extensions need (T16, ADR 0008). The extensions are Swift-only and read the file
-/// directly; everything they show was decided by the app. Unknown fields are ignored.
+/// The part of the app's snapshot (`IosSnapshot` in shared/core, fixture `iosApp/Fixtures/snapshot-v2.json`)
+/// the extensions need (T16, T31, ADR 0008). The extensions are Swift-only and read the file
+/// directly; everything they show or apply was decided by the app. Unknown fields are ignored.
 struct FocalSnapshot: Decodable {
-    struct Session: Decodable {
+    struct Session: Codable {
         let id: String
         let name: String
+        /// The Schedule that started it, if any (T31).
+        let scheduleId: String?
         let plannedEnd: Date
         let breakEndsAt: Date?
         /// Serialised tokens from Apple's picker: base64 of the token's JSON (T15).
@@ -32,8 +34,40 @@ struct FocalSnapshot: Decodable {
         }
     }
 
+    /// A switched-on Schedule (`SnapshotSchedule`); the monitor extension starts its sessions (T31).
+    struct Schedule: Decodable {
+        let id: String
+        let name: String
+        /// `HH:mm`, local time. An end at or before the start runs overnight.
+        let start: String
+        let end: String
+        let blockListId: String
+        /// `Normal`, `Delayed` or `Locked`.
+        let strictness: String
+        /// The sessions it started lately, running or ended (`SnapshotScheduleSession`). A window
+        /// one of them overlaps gets no other session.
+        let sessions: [StartedSession]?
+    }
+
+    struct StartedSession: Decodable {
+        let startedAt: Date
+        let plannedEnd: Date
+    }
+
+    struct BlockList: Decodable {
+        let id: String
+        let apps: [String]
+        let appCategories: [String]
+        let domains: [String]
+
+        var isEmpty: Bool { apps.isEmpty && appCategories.isEmpty && domains.isEmpty }
+    }
+
     let version: Int
+    let blockLists: [BlockList]
+    let schedules: [Schedule]
     let runningSessions: [Session]
+
 }
 
 enum FocalSnapshotReader {
@@ -41,7 +75,7 @@ enum FocalSnapshotReader {
     static let appGroup = "group.io.disruption.focal"
     static let fileName = "snapshot.json"
     /// `IosSnapshot.CURRENT_VERSION`. A newer snapshot is not read.
-    static let supportedVersion = 1
+    static let supportedVersion = 2
 
     private static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()

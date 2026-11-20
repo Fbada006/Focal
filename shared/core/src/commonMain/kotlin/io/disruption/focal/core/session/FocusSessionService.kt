@@ -388,7 +388,11 @@ class FocusSessionService(
                     val id = FocusSessionId(event.sessionId)
                     if (sessions.get(id) != null) continue
                     // The app may already have started this window's session itself (after a save).
-                    if (hasSessionInWindow(ScheduleId(event.scheduleId), event.at, event.plannedEnd)) continue
+                    // A window gets one session, so the extension's duplicate stops blocking.
+                    if (hasSessionInWindow(ScheduleId(event.scheduleId), event.at, event.plannedEnd)) {
+                        engine.lift(id)
+                        continue
+                    }
                     sessions.save(
                         FocusSession(
                             id = id,
