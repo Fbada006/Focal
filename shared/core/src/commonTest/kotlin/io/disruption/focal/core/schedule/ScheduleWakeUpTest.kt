@@ -5,7 +5,9 @@ import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.core.session.SessionLength
+import io.disruption.focal.core.session.StartResult
 import io.disruption.focal.core.session.SessionTestFixture
 import io.disruption.focal.core.session.socialList
 import io.disruption.focal.core.time.TimeZoneProvider
@@ -44,32 +46,32 @@ class ScheduleWakeUpTest {
 
     @Test
     fun nothingToWakeForWithoutSchedulesOrSessions() = runTest {
-        assertNull(service.nextWakeUp())
+        assertNull(service.nextWakeUp(emptyList()))
     }
 
     @Test
     fun wakesAtTheNextWindowStart() = runTest {
         service.create(tuesdayWork)
-        assertEquals(Instant.parse("2026-01-06T09:00:00Z"), service.nextWakeUp())
+        assertEquals(Instant.parse("2026-01-06T09:00:00Z"), service.nextWakeUp(emptyList()))
     }
 
     @Test
     fun aSwitchedOffScheduleNeedsNoWakeUp() = runTest {
         service.create(tuesdayWork.copy(enabled = false))
-        assertNull(service.nextWakeUp())
+        assertNull(service.nextWakeUp(emptyList()))
     }
 
     @Test
     fun wakesForTheRunningSessionsEndFirst() = runTest {
         service.create(tuesdayWork.copy(days = setOf(MONDAY, TUESDAY))) // Monday's window is open: it starts now
-        assertEquals(Instant.parse("2026-01-05T17:00:00Z"), service.nextWakeUp())
+        assertEquals(Instant.parse("2026-01-05T17:00:00Z"), service.nextWakeUp(emptyList()))
     }
 
     @Test
     fun manualSessionsEndingFirstAlsoWakeFocal() = runTest {
         service.create(tuesdayWork)
         f.service.start(socialList.id, SessionLength.For(30.minutes), Strictness.Normal)
-        assertEquals(Instant.parse("2026-01-05T10:30:00Z"), service.nextWakeUp())
+        assertEquals(Instant.parse("2026-01-05T10:30:00Z"), service.nextWakeUp(emptyList()))
     }
 
     @Test
@@ -77,20 +79,20 @@ class ScheduleWakeUpTest {
         service.create(tuesdayWork)
         // A catch-up ran just before 09:00; asking just after must not skip to next Tuesday.
         f.clock.now = Instant.parse("2026-01-06T09:00:01Z")
-        assertEquals(f.clock.now, service.nextWakeUp())
+        assertEquals(f.clock.now, service.nextWakeUp(emptyList()))
 
-        service.catchUp()
-        assertEquals(Instant.parse("2026-01-06T17:00:00Z"), service.nextWakeUp())
+        service.catchUp(emptyList())
+        assertEquals(Instant.parse("2026-01-06T17:00:00Z"), service.nextWakeUp(emptyList()))
     }
 
     @Test
     fun wakesNowForASessionPastItsEnd() = runTest {
         f.service.start(socialList.id, SessionLength.For(30.minutes), Strictness.Normal)
         f.clock.now = Instant.parse("2026-01-05T10:30:01Z")
-        assertEquals(f.clock.now, service.nextWakeUp())
+        assertEquals(f.clock.now, service.nextWakeUp(emptyList()))
 
-        service.catchUp()
-        assertNull(service.nextWakeUp())
+        service.catchUp(emptyList())
+        assertNull(service.nextWakeUp(emptyList()))
     }
 
     @Test
@@ -99,7 +101,7 @@ class ScheduleWakeUpTest {
         f.blockLists.save(socialList.copy(blocked = BlockedSet()))
         f.clock.now = Instant.parse("2026-01-06T10:00:00Z")
         // Catch-up would start nothing, so waking now would only loop: wait for next week's start.
-        assertEquals(Instant.parse("2026-01-13T09:00:00Z"), service.nextWakeUp())
+        assertEquals(Instant.parse("2026-01-13T09:00:00Z"), service.nextWakeUp(emptyList()))
     }
 
     @Test
@@ -116,7 +118,7 @@ class ScheduleWakeUpTest {
         // The skipped window becomes due once the Block List has something to block.
         f.blockLists.save(socialList)
         assertEquals(2, changes.size, "a Block List change asks the platform to re-arm")
-        assertEquals(f.clock.now, service.nextWakeUp())
+        assertEquals(f.clock.now, service.nextWakeUp(emptyList()))
         watching.cancel()
     }
 
@@ -125,15 +127,15 @@ class ScheduleWakeUpTest {
         service.create(tuesdayWork)
         f.clock.now = Instant.parse("2026-01-06T09:00:00Z")
 
-        val started = service.catchUp().single()
+        val started = service.catchUp(emptyList()).started.single()
         assertEquals(Instant.parse("2026-01-06T17:00:00Z"), started.plannedEnd)
-        assertEquals(started.plannedEnd, service.nextWakeUp())
+        assertEquals(started.plannedEnd, service.nextWakeUp(emptyList()))
 
         f.clock.now = started.plannedEnd
-        assertTrue(service.catchUp().isEmpty())
+        assertTrue(service.catchUp(emptyList()).started.isEmpty())
         assertEquals(Outcome.Completed, f.sessions.get(started.id)!!.outcome)
         assertTrue(f.sessions.getRunning().isEmpty())
-        assertEquals(Instant.parse("2026-01-13T09:00:00Z"), service.nextWakeUp(), "the next Tuesday")
+        assertEquals(Instant.parse("2026-01-13T09:00:00Z"), service.nextWakeUp(emptyList()), "the next Tuesday")
     }
 
     @Test
@@ -141,7 +143,7 @@ class ScheduleWakeUpTest {
         service.create(tuesdayWork)
         f.clock.now = Instant.parse("2026-01-06T11:00:00Z") // the phone was off at 09:00
 
-        val started = service.catchUp().single()
+        val started = service.catchUp(emptyList()).started.single()
         assertEquals(Instant.parse("2026-01-06T11:00:00Z"), started.startedAt)
         assertEquals(Instant.parse("2026-01-06T17:00:00Z"), started.plannedEnd)
     }
@@ -150,7 +152,7 @@ class ScheduleWakeUpTest {
     fun aTimeZoneChangeMovesTheNextStart() = runTest {
         service.create(tuesdayWork)
         zone = TimeZone.of("Europe/Berlin")
-        assertEquals(Instant.parse("2026-01-06T08:00:00Z"), service.nextWakeUp())
+        assertEquals(Instant.parse("2026-01-06T08:00:00Z"), service.nextWakeUp(emptyList()))
     }
 
     @Test
@@ -184,5 +186,49 @@ class ScheduleWakeUpTest {
             ScheduleWindows.nextStart(schedules.map { if (it.name == "Tonight") it.copy(enabled = false) else it }, now, TimeZone.UTC),
         )
         assertEquals(Instant.parse("2026-01-12T22:00:00Z"), ScheduleWindows.nextStart(schedules.drop(1), now + 13.hours, TimeZone.UTC))
+    }
+
+    @Test
+    fun withoutBlockingPermissionCatchUpStartsNoScheduleSession() = runTest {
+        service.create(tuesdayWork)
+        f.clock.now = Instant.parse("2026-01-06T09:30:00Z")
+
+        val report = service.catchUp(listOf(Permission.AccessibilityService))
+
+        assertTrue(report.started.isEmpty(), "a Locked session that blocks nothing must not start")
+        assertTrue(f.sessions.getRunning().isEmpty())
+        assertEquals(
+            Instant.parse("2026-01-13T09:00:00Z"),
+            service.nextWakeUp(listOf(Permission.AccessibilityService)),
+            "the open window isn't due now, or the alarm would fire again at once",
+        )
+
+        // Once the permission is back, the rest of the window starts.
+        val started = service.catchUp(emptyList()).started.single()
+        assertEquals(Instant.parse("2026-01-06T17:00:00Z"), started.plannedEnd)
+    }
+
+    @Test
+    fun withoutBlockingPermissionCatchUpStillCompletesAndBreaks() = runTest {
+        val ending = f.service.start(socialList.id, SessionLength.For(30.minutes), Strictness.Normal)
+        val locked = f.service.start(socialList.id, SessionLength.For(2.hours), Strictness.Locked)
+        f.clock.now = Instant.parse("2026-01-05T10:30:01Z")
+
+        val report = service.catchUp(listOf(Permission.AccessibilityService))
+
+        assertEquals(Outcome.Completed, f.sessions.get((ending as StartResult.Started).session.id)!!.outcome)
+        assertEquals(listOf((locked as StartResult.Started).session.id), report.broken.map { it.id })
+        assertEquals(Outcome.Broken, f.sessions.get((locked as StartResult.Started).session.id)!!.outcome)
+    }
+
+    @Test
+    fun aMissingNonBlockingPermissionDoesNotStopSchedules() = runTest {
+        service.create(tuesdayWork)
+        f.clock.now = Instant.parse("2026-01-06T09:00:00Z")
+
+        val report = service.catchUp(listOf(Permission.Notifications, Permission.ExactAlarms))
+
+        assertEquals(1, report.started.size)
+        assertTrue(report.broken.isEmpty())
     }
 }

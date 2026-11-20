@@ -5,6 +5,7 @@ import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.Schedule
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.ScheduleRepository
 import io.disruption.focal.core.session.FocusSessionService
@@ -26,6 +27,9 @@ data class ScheduleDraft(
     val strictness: Strictness,
     val enabled: Boolean = true,
 )
+
+/** What [ScheduleService.catchUp] did: the Schedule sessions it [started] and the Locked sessions it found [broken]. */
+data class CatchUpReport(val started: List<FocusSession>, val broken: List<FocusSession>)
 
 sealed interface ScheduleSaveResult {
     data class Saved(val schedule: Schedule) : ScheduleSaveResult
@@ -85,14 +89,28 @@ class ScheduleService(
      * Complete sessions that ran out and start the ones Schedules have due now. Platforms call it
      * when a Schedule alarm fires, after a reboot and when the clock or time zone changes; a start
      * that was missed meanwhile still starts, for what is left of its window (T28, T30).
+     *
+     * [missing] is what the permission gateway reports missing now. Without a permission blocking
+     * depends on, running Locked sessions are Broken ([FocusSessionService.checkPermissions]) and no
+     * Schedule session starts: it would block nothing, yet could end Completed and count for the
+     * Streak. Its window starts once the permission is back and Focal catches up again.
      */
-    suspend fun catchUp(): List<FocusSession> {
+    suspend fun catchUp(missing: Collection<Permission>): CatchUpReport {
         sessions.completeDueSessions()
-        return evaluate()
+        val broken = sessions.checkPermissions(missing)
+        val started = if (canStartSessions(missing)) evaluate() else emptyList()
+        return CatchUpReport(started = started, broken = broken)
     }
 
-    /** When to wake Focal next for a Schedule start or a session end; see [FocusSessionService.nextWakeUp]. */
-    suspend fun nextWakeUp(): Instant? = sessions.nextWakeUp(schedules.getAll(), timeZone.current())
+    /**
+     * When to wake Focal next for a Schedule start or a session end; see [FocusSessionService.nextWakeUp].
+     * While a permission blocking depends on is [missing], a window already open isn't due now:
+     * catching up wouldn't start it, so waking for it would only repeat.
+     */
+    suspend fun nextWakeUp(missing: Collection<Permission>): Instant? =
+        sessions.nextWakeUp(schedules.getAll(), timeZone.current(), schedulesCanStart = canStartSessions(missing))
+
+    private fun canStartSessions(missing: Collection<Permission>) = missing.none { it.blockingDependsOn }
 
     /**
      * Emits whenever [nextWakeUp] may have moved, so the platform re-arms its alarm: a Schedule, a

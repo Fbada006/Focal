@@ -55,6 +55,9 @@ class FocalAccessibilityService : AccessibilityService() {
         }.getOrNull() ?: return
         this.engine = engine
         noise = NoisePackages(this)
+        // Schedules don't start sessions while the service is off (T30): start one whose window is
+        // open now, and re-arm the alarm for it.
+        (application as? FocalApplication)?.catchUpSchedules()
 
         val overlay = ShieldOverlay(
             service = this,

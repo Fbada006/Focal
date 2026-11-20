@@ -181,13 +181,15 @@ class FocusSessionService(
      *
      * Now, when something is already due that a catch-up would act on: a running session past its
      * planned end, or a Schedule window that has begun without its session. Time passes between a
-     * catch-up and this call, so a start or end that fell in between must not be skipped.
+     * catch-up and this call, so a start or end that fell in between must not be skipped. A window
+     * that has begun counts only if [schedulesCanStart]: a catch-up that can't start it would wake
+     * Focal again at once.
      */
-    suspend fun nextWakeUp(schedules: List<Schedule>, zone: TimeZone): Instant? = mutex.withLock {
+    suspend fun nextWakeUp(schedules: List<Schedule>, zone: TimeZone, schedulesCanStart: Boolean = true): Instant? = mutex.withLock {
         val now = clock.now()
         val running = sessions.getRunning()
         if (running.any { it.plannedEnd <= now }) return now
-        if (schedules.any { dueWindowLocked(it, now, zone) != null }) return now
+        if (schedulesCanStart && schedules.any { dueWindowLocked(it, now, zone) != null }) return now
         val nextStart = ScheduleWindows.nextStart(schedules, now, zone)
         val nextEnd = running.minOfOrNull { it.plannedEnd }
         listOfNotNull(nextStart, nextEnd).minOrNull()

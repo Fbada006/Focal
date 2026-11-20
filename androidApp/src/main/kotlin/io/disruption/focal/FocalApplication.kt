@@ -78,15 +78,20 @@ class FocalApplication : Application() {
         return scope.launch { runCatching { catchUpAndArm() } }
     }
 
+    /**
+     * Without the accessibility service, a Schedule session would block nothing, so the shared
+     * catch-up starts none and records running Locked sessions as Broken instead (T22, T30).
+     */
     private suspend fun catchUpAndArm() {
         val schedules = koin.get<ScheduleService>()
-        schedules.catchUp()
+        val broken = schedules.catchUp(koin.get<PermissionGateway>().missing()).broken
+        if (broken.isNotEmpty()) BrokenSessionNotifier.notify(this, broken)
         armNextWakeUp(schedules)
     }
 
     /** Work out the next wake-up and set the alarm as one step, so the latest computation wins. */
     private suspend fun armNextWakeUp(schedules: ScheduleService) = armLock.withLock {
-        alarms.arm(schedules.nextWakeUp())
+        alarms.arm(schedules.nextWakeUp(koin.get<PermissionGateway>().missing()))
     }
 
     /** Any change to Schedules, Block Lists or running sessions can move the next wake-up: re-arm on each. */
