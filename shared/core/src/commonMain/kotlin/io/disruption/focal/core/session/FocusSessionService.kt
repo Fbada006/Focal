@@ -14,9 +14,14 @@ import io.disruption.focal.core.schedule.ScheduleWindows
 import kotlinx.datetime.TimeZone
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -46,6 +51,19 @@ class FocusSessionService(
 
     /** Exit Countdowns in progress, by session. Held in memory: leaving the countdown cancels it. */
     private val countdowns = mutableMapOf<FocusSessionId, ExitCountdown>()
+
+    private val unacknowledgedBroken = MutableStateFlow<List<FocusSession>>(emptyList())
+
+    /**
+     * Sessions recorded as Broken since this process started that the user hasn't acknowledged, so
+     * whichever check noticed the revocation, the UI can still warn about it (story 41).
+     */
+    val brokenToAcknowledge: StateFlow<List<FocusSession>> = unacknowledgedBroken.asStateFlow()
+
+    /** The user has seen the warning for [brokenToAcknowledge]. */
+    fun acknowledgeBroken() {
+        unacknowledgedBroken.value = emptyList()
+    }
 
     /** Running sessions, ordered by planned end. */
     val running: Flow<List<FocusSession>> = sessions.observeRunning()
@@ -282,10 +300,22 @@ class FocusSessionService(
     suspend fun markBlockingDefeated(): List<FocusSession> = mutex.withLock {
         completeDueLocked()
         val now = clock.now()
-        sessions.getRunning()
+        val broken = sessions.getRunning()
             .filter { it.strictness == Strictness.Locked }
             .map { finish(it, Outcome.Broken, now) }
+        if (broken.isNotEmpty()) unacknowledgedBroken.update { it + broken }
+        broken
     }
+
+    /**
+     * Check what the platform reports missing against the running sessions (ADR 0002). If a
+     * permission blocking depends on is gone, blocking was defeated from outside Focal: running
+     * Locked sessions become Broken ([markBlockingDefeated]). Platforms call this whenever they
+     * might notice a revocation: when Focal's process starts, when it comes to the foreground, and
+     * on Android when the accessibility service is unbound. Returns the sessions it broke.
+     */
+    suspend fun checkPermissions(missing: Collection<Permission>): List<FocusSession> =
+        if (missing.any { it.blockingDependsOn }) markBlockingDefeated() else emptyList()
 
     /**
      * Record every running session whose planned end has passed as Completed and lift its

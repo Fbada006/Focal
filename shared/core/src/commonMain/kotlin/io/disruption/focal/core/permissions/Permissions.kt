@@ -13,6 +13,15 @@ enum class Permission {
 
     /** Android: exact alarms for Schedules, asked only when the first Schedule is created. */
     ExactAlarms,
+    ;
+
+    /**
+     * Whether blocking depends on this permission, so revoking it defeats blocking and makes a
+     * running Locked session Broken (ADR 0002). Notifications and exact alarms are required or
+     * useful, but nothing stays unblocked without them, so losing them only asks for a fix.
+     */
+    val blockingDependsOn: Boolean
+        get() = this == AccessibilityService || this == ScreenTime
 }
 
 /**

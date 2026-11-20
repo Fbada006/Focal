@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -81,6 +82,17 @@ fun HomeScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            state.brokenWarning?.let { warning ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(warning, color = MaterialTheme.colorScheme.onErrorContainer)
+                        TextButton(onClick = { onIntent(HomeIntent.BrokenWarningDismissed) }) { Text("OK") }
+                    }
+                }
+            }
             state.missingPermissions.forEach { permission ->
                 PermissionBanner(
                     permission = permission,

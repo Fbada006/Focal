@@ -8,6 +8,7 @@ import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.session.BreakResult
 import io.disruption.focal.core.session.FocusSessionService
+import io.disruption.focal.ui.permissions.brokenWarning
 import io.disruption.focal.ui.mvi.MviViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -43,6 +44,8 @@ data class HomeState(
     val permissionsChecked: Boolean = false,
     /** The session whose last Break was refused because Focal couldn't schedule its end. */
     val breakUnavailableFor: String? = null,
+    /** Locked sessions just recorded as Broken because blocking was switched off (story 41). */
+    val brokenWarning: String? = null,
 ) {
     val canStart: Boolean get() = permissionsChecked && missingPermissions.isEmpty()
 }
@@ -57,6 +60,7 @@ sealed interface HomeIntent {
     data class TakeBreakClicked(val sessionId: String) : HomeIntent
     data class EditClicked(val sessionId: String) : HomeIntent
     data class FixPermissionClicked(val permission: Permission) : HomeIntent
+    data object BrokenWarningDismissed : HomeIntent
 
     /** Focal came back to the foreground; permissions may have changed. */
     data object Resumed : HomeIntent
@@ -82,6 +86,11 @@ class HomeViewModel(
     init {
         refreshPermissions()
         viewModelScope.launch {
+            sessions.brokenToAcknowledge.collect { broken ->
+                setState { copy(brokenWarning = broken.takeIf { it.isNotEmpty() }?.let { warningFor(it) }) }
+            }
+        }
+        viewModelScope.launch {
             combine(sessions.running, ticks.onStart { emit(Unit) }) { running, _ -> running }
                 .collect { running -> render(running) }
         }
@@ -91,6 +100,7 @@ class HomeViewModel(
         when (intent) {
             HomeIntent.StartClicked -> if (currentState.canStart) emit(HomeEffect.OpenStart)
             HomeIntent.Resumed -> refreshPermissions()
+            HomeIntent.BrokenWarningDismissed -> sessions.acknowledgeBroken()
             is HomeIntent.FixPermissionClicked -> permissions.request(intent.permission)
             HomeIntent.BlockListsClicked -> emit(HomeEffect.OpenBlockLists)
             HomeIntent.SchedulesClicked -> emit(HomeEffect.OpenSchedules)
@@ -108,6 +118,10 @@ class HomeViewModel(
     private fun refreshPermissions() {
         viewModelScope.launch {
             val missing = permissions.missing()
+            // A permission blocking depends on was revoked while Focal was away (ADR 0002).
+            // A permission blocking depends on was revoked while Focal was away (ADR 0002). The
+            // warning itself comes from `brokenToAcknowledge`, whichever check broke the session.
+            sessions.checkPermissions(missing)
             setState { copy(missingPermissions = missing, permissionsChecked = true) }
         }
     }
@@ -146,6 +160,8 @@ class HomeViewModel(
         }
     }
 }
+
+private fun warningFor(broken: List<FocusSession>): String = brokenWarning(broken.map { it.name })
 
 internal fun everySecond(): Flow<Unit> = flow {
     while (true) {
