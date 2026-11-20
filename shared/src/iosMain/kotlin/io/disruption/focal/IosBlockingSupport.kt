@@ -19,3 +19,6 @@ private fun storeName(id: String): String = "focal-session-$id"
  * The DeviceActivityMonitor extension recognises it by the `focal-break-` prefix (`BreakResumer`).
  */
 fun breakActivityName(sessionId: FocusSessionId): String = "focal-break-${sessionId.value}"
+
+/** [sessionId] as the plain id the extensions see in the snapshot (`FocalEndedSessions`, T20). */
+fun sessionIdString(sessionId: FocusSessionId): String = sessionId.value

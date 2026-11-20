@@ -44,3 +44,32 @@ enum FocalStore {
         })
     }
 }
+
+/// Sessions the app has ended, so the DeviceActivityMonitor never re-applies one after the app
+/// lifted it (T20). The snapshot alone can't say this in time: the app rewrites it only after the
+/// session is saved and lifted, and the monitor may read the old one in between.
+///
+/// Both sides follow an order that closes the race without a lock: the app records the session as
+/// ended, then clears its store; the monitor applies the store, then checks the record and clears
+/// the store again if the session ended. Whichever runs last leaves the store empty.
+enum FocalEndedSessions {
+    /// `APP_GROUP_ID` in Kotlin, `FocalSnapshotReader.appGroup` in the extensions.
+    private static let appGroup = "group.io.disruption.focal"
+    private static let key = "endedSessionIds"
+    /// Only a session that ended moments ago can race with the monitor; keep the record small.
+    private static let limit = 50
+
+    private static var defaults: UserDefaults? { UserDefaults(suiteName: appGroup) }
+
+    static func record(_ sessionId: String) {
+        guard let defaults else { return }
+        var ids = defaults.stringArray(forKey: key) ?? []
+        guard !ids.contains(sessionId) else { return }
+        ids.append(sessionId)
+        defaults.set(Array(ids.suffix(limit)), forKey: key)
+    }
+
+    static func contains(_ sessionId: String) -> Bool {
+        defaults?.stringArray(forKey: key)?.contains(sessionId) ?? false
+    }
+}

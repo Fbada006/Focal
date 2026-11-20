@@ -25,22 +25,51 @@ final class IosBlockingEngine: NSObject, BlockingEngine {
     }
 
     /// A Break interval left registered here is harmless: the monitor finds the session gone from
-    /// the snapshot and does nothing. Stopping it could itself end the interval early.
+    /// the snapshot, or recorded as ended, and does nothing. Stopping it could itself end the
+    /// interval early. The session is recorded as ended before its store is cleared (see
+    /// `FocalEndedSessions`), so a monitor re-applying it at this moment clears it again.
     func lift(sessionId: Any, completionHandler: @escaping (Error?) -> Void) {
-        FocalStore.named(IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)).clearAllSettings()
+        let name = IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)
+        breakTimers.removeValue(forKey: name)?.cancel()
+        FocalEndedSessions.record(IosBlockingSupportKt.sessionIdString(sessionId: sessionId))
+        FocalStore.named(name).clearAllSettings()
         completionHandler(nil)
     }
 
     /// A Break lifts this session's blocking until [until] (T20). The DeviceActivityMonitor extension
-    /// re-applies it then, even while Focal isn't running; Focal also re-applies it whenever it comes
-    /// to the foreground, in case the interval didn't fire.
+    /// re-applies it then, even while Focal isn't running. While Focal is open, a timer catches up at
+    /// the Break's end too; and Focal re-applies running sessions whenever it comes to the
+    /// foreground, in case neither fired.
     func pauseUntil(sessionId: Any, until: KotlinInstant, completionHandler: @escaping (Error?) -> Void) {
-        FocalStore.named(IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)).clearAllSettings()
+        let name = IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)
+        FocalStore.named(name).clearAllSettings()
         let end = Date(timeIntervalSince1970: TimeInterval(until.toEpochMilliseconds()) / 1000)
         let activity = DeviceActivityName(IosBlockingSupportKt.breakActivityName(sessionId: sessionId))
-        // Registering fails without Screen Time authorisation; the foreground re-apply still covers it.
-        try? Self.monitorBreak(activity, endingAt: end)
+        do {
+            try Self.monitorBreak(activity, endingAt: end)
+        } catch {
+            // Registering fails without Screen Time authorisation, when no store blocks anything
+            // anyway. The timer below and the foreground re-apply still end the Break.
+            NSLog("Focal: couldn't register the Break's end for %@: %@", name, String(describing: error))
+        }
+        catchUp(at: end, key: name)
         completionHandler(nil)
+    }
+
+    /// Pending in-app Break ends, by store name. Taking or re-applying a Break replaces its timer.
+    private var breakTimers: [String: DispatchWorkItem] = [:]
+
+    /// Run Focal's catch-up (ingest, then re-apply running sessions) just after [end], if Focal is
+    /// still running then. A suspended app's timer fires when it resumes, which the foreground
+    /// catch-up covers anyway.
+    private func catchUp(at end: Date, key: String) {
+        breakTimers.removeValue(forKey: key)?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.breakTimers.removeValue(forKey: key)
+            StartFocalKt.focalDidBecomeActive()
+        }
+        breakTimers[key] = work
+        DispatchQueue.main.asyncAfter(wallDeadline: .now() + max(0, end.timeIntervalSinceNow) + 1, execute: work)
     }
 
     /// DeviceActivity intervals must last at least 15 minutes, and a Break lasts 5, so the interval

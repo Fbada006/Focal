@@ -90,6 +90,55 @@ class IosContractTest {
     }
 
     @Test
+    fun compactingDropsOnlyTheIngestedEvents() {
+        val ingested = """
+            {"version": 1, "events": [
+              {"type": "somethingNew", "id": "x", "at": "2026-01-05T09:00:00Z"},
+              {"type": "breakEnded", "id": "ev-2", "at": "not a time", "sessionId": "fs-2"},
+              {"type": "breakEnded", "id": "ev-3", "at": "2026-01-05T10:00:00Z", "sessionId": "fs-2"}
+            ]}
+        """.trimIndent()
+        // The extension appended ev-4 after the app read the log.
+        val current = ingested.replace(
+            "\"fs-2\"}\n]}",
+            "\"fs-2\"},\n{\"type\": \"breakEnded\", \"id\": \"ev-4\", \"at\": \"2026-01-05T11:00:00Z\", \"sessionId\": \"fs-2\"}\n]}",
+        )
+
+        val compacted = IosContract.withoutIngested(current, ingested)!!
+
+        assertEquals(
+            listOf(ExtensionEvent.BreakEnded("ev-4", Instant.parse("2026-01-05T11:00:00Z"), "fs-2")),
+            IosContract.decodeEvents(compacted),
+        )
+        // The unknown and malformed entries are kept for a version that understands them.
+        assertTrue("\"somethingNew\"" in compacted)
+        assertTrue("\"not a time\"" in compacted)
+        assertNull(IosContract.withoutIngested(compacted, ingested))
+    }
+
+    @Test
+    fun aLogWithNothingIngestedOrFromANewerVersionIsLeftAlone() {
+        val log = IosContract.encodeEvents(ContractSamples.events)
+        assertNull(IosContract.withoutIngested(log, IosContract.encodeEvents(ExtensionEventLog())))
+        assertNull(IosContract.withoutIngested(log.replaceFirst("\"version\": 1", "\"version\": 2"), log))
+        assertNull(IosContract.withoutIngested("not json", log))
+    }
+
+    @Test
+    fun aCompactedLogIngestsToTheSameState() = runTest {
+        val f = SessionTestFixture()
+        val log = IosContract.encodeEvents(ExtensionEventLog(events = listOf(scheduleStart(f.clock.now))))
+        ingestOnLaunch(f.service, log)
+
+        val compacted = IosContract.withoutIngested(log, log)!!
+        val report = ingestOnLaunch(f.service, compacted)
+
+        assertTrue(IosContract.decodeEvents(compacted).isEmpty())
+        assertEquals(0, report.sessionsStarted)
+        assertEquals(1, f.sessions.all.size)
+    }
+
+    @Test
     fun ingestingAScheduleStartCreatesTheSessionWithTheBlockListsCopy() = runTest {
         val f = SessionTestFixture()
         val event = ExtensionEvent.ScheduleSessionStarted(

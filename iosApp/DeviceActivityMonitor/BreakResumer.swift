@@ -23,20 +23,32 @@ enum BreakResumer {
     }
 
     static func resume(sessionId: String, now: Date) {
-        // Without a snapshot, or once the session has ended, there is nothing to put back: blocking a
-        // finished session would outlive it.
+        // Only the end of the Break the app last recorded for a running session counts. Without a
+        // snapshot, once the session has ended, or when this end belongs to another Break (say, an
+        // earlier one, or the app re-registered the interval for an edited session), there is nothing
+        // to put back: blocking a finished session would outlive it.
         guard let session = FocalSnapshotReader.load()?.runningSessions.first(where: { $0.id == sessionId }),
-              session.plannedEnd > now else { return }
-        // The app says the session is still on a Break (say, it re-registered the interval for an
-        // edited session), so this end is stale.
-        if let breakEndsAt = session.breakEndsAt, breakEndsAt > now.addingTimeInterval(tolerance) { return }
+              session.plannedEnd > now,
+              let breakEndsAt = session.breakEndsAt,
+              breakEndsAt <= now.addingTimeInterval(tolerance),
+              // A Break that runs to the session's planned end ends with the session: nothing resumes,
+              // and nothing here would clear the store again once the session is over.
+              breakEndsAt < session.plannedEnd,
+              !FocalEndedSessions.contains(sessionId) else { return }
 
+        let store = FocalStore.named(sessionId: sessionId)
         FocalStore.apply(
             apps: session.apps,
             appCategories: session.appCategories,
             domains: session.domains,
-            to: FocalStore.named(sessionId: sessionId)
+            to: store
         )
+        // The app may have ended the session since the snapshot was read; it records that before it
+        // clears the store, so checking after applying never leaves a finished session blocking.
+        if FocalEndedSessions.contains(sessionId) {
+            store.clearAllSettings()
+            return
+        }
         FocalEventLog.append(type: "breakEnded", at: now, fields: ["sessionId": sessionId])
     }
 }
