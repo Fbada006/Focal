@@ -82,3 +82,36 @@ class CommittedSite {
         host = null
     }
 }
+
+/**
+ * Whether an event from a supported browser can be trusted, given which package owns the active
+ * window. Accessibility events arrive late and from windows in the background, so only the active
+ * window says what is really in front.
+ */
+enum class BrowserWindow {
+    /** The browser is the active window: read its address bar. */
+    Active,
+
+    /**
+     * The active window can't say what is in front: no root yet (views not laid out), or Focal's
+     * own Shield is on top. Take the browser's word for now.
+     */
+    NotReady,
+
+    /** Another app owns the active window: the event is stale or from the background, ignore it. */
+    OtherApp,
+    ;
+
+    companion object {
+        /**
+         * [activeWindowPackage] is null when there is no active window root yet; [focalPackage] is
+         * Focal's own, whose Shield window becomes the active window while shown.
+         */
+        fun of(browser: String, activeWindowPackage: String?, focalPackage: String): BrowserWindow =
+            when (activeWindowPackage) {
+                null, focalPackage -> NotReady
+                browser -> Active
+                else -> OtherApp
+            }
+    }
+}

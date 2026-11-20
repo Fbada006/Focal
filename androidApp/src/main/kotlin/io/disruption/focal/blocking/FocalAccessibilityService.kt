@@ -11,6 +11,7 @@ import io.disruption.focal.FocalApplication
 import io.disruption.focal.MainActivity
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.website.AddressBarReading
+import io.disruption.focal.core.website.BrowserWindow
 import io.disruption.focal.core.website.CommittedSite
 import io.disruption.focal.core.website.SupportedBrowsers
 import kotlinx.coroutines.CoroutineScope
@@ -108,21 +109,26 @@ class FocalAccessibilityService : AccessibilityService() {
             return
         }
         // The new window's views may not be laid out yet: check now, and again once they settle.
-        if (!checkAddressBar(packageName)) engine.onForeground(packageName, site.update(packageName, null))
+        // A late event from a browser that is no longer the active window must not replace the app
+        // really in front (and its Shield), so it is ignored.
+        when (checkAddressBar(packageName)) {
+            BrowserWindow.Active, BrowserWindow.OtherApp -> Unit
+            BrowserWindow.NotReady -> engine.onForeground(packageName, site.update(packageName, null))
+        }
         scheduleAddressBarCheck(packageName)
     }
 
     /**
-     * Read [browser]'s address bar and report the committed site to the engine. Returns false, and
-     * does nothing, when [browser] isn't the active window (the event came from a browser in the
-     * background, or the Shield is on top).
+     * Read [browser]'s address bar and report the committed site to the engine, but only when
+     * [browser] is the active window; otherwise do nothing and say why ([BrowserWindow]).
      */
-    private fun checkAddressBar(browser: String): Boolean {
-        val engine = engine ?: return false
-        val root = rootInActiveWindow ?: return false
-        if (root.packageName?.toString() != browser) return false
-        engine.onForeground(browser, site.update(browser, readAddressBar(root, browser)))
-        return true
+    private fun checkAddressBar(browser: String): BrowserWindow {
+        val root = rootInActiveWindow
+        val window = BrowserWindow.of(browser, root?.packageName?.toString(), packageName)
+        if (window == BrowserWindow.Active && root != null) {
+            engine?.onForeground(browser, site.update(browser, readAddressBar(root, browser)))
+        }
+        return window
     }
 
     private fun readAddressBar(root: AccessibilityNodeInfo, browser: String): AddressBarReading? {
