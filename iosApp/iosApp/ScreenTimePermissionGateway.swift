@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import FamilyControls
 import UserNotifications
 import Shared
@@ -34,7 +35,21 @@ final class ScreenTimePermissionGateway: NSObject, PermissionGateway {
                 try? await AuthorizationCenter.shared.requestAuthorization(for: .individual)
             }
         case Permission.notifications.name:
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+            // iOS asks only once; after a denial the only way back is Focal's page in Settings.
+            let center = UNUserNotificationCenter.current()
+            center.getNotificationSettings { settings in
+                switch settings.authorizationStatus {
+                case .notDetermined:
+                    center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+                case .denied:
+                    DispatchQueue.main.async {
+                        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+                        UIApplication.shared.open(url)
+                    }
+                default:
+                    break
+                }
+            }
         default:
             break
         }

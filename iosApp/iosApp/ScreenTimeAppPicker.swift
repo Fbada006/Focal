@@ -11,9 +11,13 @@ final class ScreenTimeAppPicker: NSObject, IosScreenTimePicker {
 
     private var blockListId: String?
 
-    func present(blockListId: String) {
+    func present(blockListId: String, apps: Set<String>, categories: Set<String>) {
         self.blockListId = blockListId
-        let sheet = FamilyPickerSheet { [weak self] selection in
+        // Start from what the Block List already holds, so Done keeps earlier picks.
+        var current = FamilyActivitySelection()
+        current.applicationTokens = Set(apps.compactMap { Self.deserialise($0, as: ApplicationToken.self) })
+        current.categoryTokens = Set(categories.compactMap { Self.deserialise($0, as: ActivityCategoryToken.self) })
+        let sheet = FamilyPickerSheet(selection: current) { [weak self] selection in
             self?.store(selection)
         }
         let host = UIHostingController(rootView: sheet)
@@ -39,6 +43,11 @@ final class ScreenTimeAppPicker: NSObject, IosScreenTimePicker {
         return data.base64EncodedString()
     }
 
+    private static func deserialise<T: Decodable>(_ string: String, as type: T.Type) -> T? {
+        guard let data = Data(base64Encoded: string) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
+    }
+
     private func topViewController() -> UIViewController? {
         let scene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -53,8 +62,13 @@ final class ScreenTimeAppPicker: NSObject, IosScreenTimePicker {
 
 private struct FamilyPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var selection = FamilyActivitySelection()
+    @State private var selection: FamilyActivitySelection
     let onDone: (FamilyActivitySelection) -> Void
+
+    init(selection: FamilyActivitySelection, onDone: @escaping (FamilyActivitySelection) -> Void) {
+        _selection = State(initialValue: selection)
+        self.onDone = onDone
+    }
 
     var body: some View {
         NavigationStack {
