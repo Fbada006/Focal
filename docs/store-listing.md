@@ -25,7 +25,7 @@ Pick a Block List, a duration or end time, and a Strictness:
 - Delayed: ending early means sitting through a 30-second Exit Countdown, and you get up to three 5-minute Breaks.
 - Locked: it can't be ended or shortened until it runs out. You can still make a running session stricter.
 
-Run as many Focus Sessions at once as you like.
+Run several Focus Sessions at once; their Block Lists add up. (iPhone: Screen Time limits how many can run at the same time.)
 
 **Schedules**
 Set days, a start and an end time, a Block List and a Strictness, and Focal starts the Focus Session for you, even when Focal is closed.
@@ -47,6 +47,7 @@ No account, no ads, no tracking. Your Block Lists, Schedules and history stay on
 **Good to know: iPhone**
 - Focal uses Apple's Screen Time, with your permission. While a Locked session runs, Focal can't be deleted (Uninstall Protection).
 - Blocked websites show the system's restricted page rather than Focal's Shield.
+- Screen Time caps how many Focus Sessions and Schedules Focal can keep at once, so very many overlapping sessions may not all be enforced.
 
 Focal is built to help you focus; it isn't a parental-control or monitoring tool.
 

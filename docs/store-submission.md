@@ -22,7 +22,7 @@ Related drafts: [privacy policy](privacy-policy.md), [store listing copy](store-
 
 | Permission | Used for |
 | --- | --- |
-| `POST_NOTIFICATIONS` | Running Focus Session notification; "Locked session Broken" notification |
+| `POST_NOTIFICATIONS` | Running Focus Session notification; "Locked session Broken" notification (Android only; on iOS the only notification is the Shield's "Open Focal", see 2.2) |
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` | `RunningSessionService` |
 | `RECEIVE_BOOT_COMPLETED` | Re-apply running Focus Sessions and re-arm Schedule alarms after reboot or app update |
 | `SCHEDULE_EXACT_ALARM` | Start and end Schedules on time |
@@ -83,7 +83,7 @@ The manifest sets the subtype property on `RunningSessionService`:
 
 **Play Console justification text (paste-ready).**
 
-> Focal's `RunningSessionService` runs while at least one Focus Session is running. A Focus Session is a period the user explicitly started (or a Schedule they created started) in which chosen apps and websites are blocked. The service keeps Focal's process alive so blocking, Break handling and session end are not lost when the system reclaims memory, and it shows an ongoing, user-visible notification with the remaining time and what is blocked. It stops when the last running session ends. None of the standard foreground service types fits: it is not media playback, location, health, data sync or a phone call; it supports a user-initiated, time-boxed blocking feature. The service only starts from a user action or from an exact alarm for a user-created Schedule, and the user can end Normal and Delayed sessions (Locked sessions only once their time runs out) and thereby stop the service.
+> Focal's `RunningSessionService` runs while at least one Focus Session is running. A Focus Session is a period the user explicitly started (or a Schedule they created started) in which chosen apps and websites are blocked. The service keeps Focal's process alive so blocking, Break handling and session end are not lost when the system reclaims memory, and it shows an ongoing, user-visible notification with the remaining time and what is blocked. It stops when the last running session ends. None of the standard foreground service types fits: it is not media playback, location, health, data sync or a phone call; it supports a user-initiated, time-boxed blocking feature. The service starts when a Focus Session starts (from a user action or an exact alarm for a user-created Schedule) and, while a session is still running, when Focal restores it: after a reboot or app update (`BootReceiver`), when Focal's process restarts, and when the system restarts the service itself (`START_STICKY`). The user can end Normal and Delayed sessions (Locked sessions only once their time runs out) and thereby stop the service.
 
 Video demo for this: shot 5 above (notification) and shot 8 (session ends, notification disappears).
 
@@ -158,15 +158,15 @@ The Xcode project (`iosApp/iosApp.xcodeproj`) builds four targets. Bundle ids co
 
 Common preamble to include in each request:
 
-> Focal is a focus app for iPhone. A user chooses apps, App Categories and websites with the system FamilyControls picker, groups them into Block Lists, and blocks them during Focus Sessions that the user starts or schedules. Focal uses individual (`.individual`) authorization on the user's own device, with the user's explicit approval in the system Screen Time prompt. It does not monitor children, does not collect data, has no accounts and no backend: all selections and history stay on the device (the selections are opaque tokens that never leave it). The app group `group.io.disruption.focal` is used only to share a small local snapshot of the user's Block Lists, Schedules and running sessions between the app and its extensions.
+> Focal is a focus app for iPhone. A user chooses apps and App Categories with the system FamilyControls picker and types websites as domain names, groups them into Block Lists, and blocks them during Focus Sessions that the user starts or schedules. Focal uses individual (`.individual`) authorization on the user's own device, with the user's explicit approval in the system Screen Time prompt. It does not monitor children, does not collect data, has no accounts and no backend: all selections and history stay on the device (app and category selections are opaque tokens; websites are the domains the user typed; none of it leaves the device). The app group `group.io.disruption.focal` is used only to share a small local snapshot of the user's Block Lists, Schedules and running sessions between the app and its extensions.
 
 **Focal (app), `io.disruption.focal.Focal`.**
 
-> Requests individual FamilyControls authorization; presents the FamilyActivityPicker so the user selects apps, categories and websites for a Block List; applies and clears Shields through one named `ManagedSettingsStore` per Focus Session (`shield.applications`, `shield.applicationCategories`, web content filter); sets `denyAppRemoval` while a Locked Focus Session runs (Uninstall Protection, which ends with the last Locked session); registers DeviceActivity schedules for Focal's Schedules, session ends and Breaks. Without the entitlement none of the app's blocking can function.
+> Requests individual FamilyControls authorization; presents the FamilyActivityPicker so the user selects apps and categories for a Block List (websites are typed as domains in Focal, not picked); applies and clears Shields through one named `ManagedSettingsStore` per Focus Session (`shield.applications`, `shield.applicationCategories`, and `webContent.blockedByFilter` for the typed domains); sets `denyAppRemoval` while a Locked Focus Session runs (Uninstall Protection, which ends with the last Locked session); registers DeviceActivity schedules for Focal's Schedules, session ends and Breaks. Without the entitlement none of the app's blocking can function.
 
 **ShieldConfiguration, `io.disruption.focal.Focal.ShieldConfiguration`.**
 
-> Provides the custom Shield shown in place of a blocked app, category or website: it names the Focus Session holding the block, the approximate time left and a motivational line, read from the local snapshot in the App Group. It collects nothing and performs no network access.
+> Provides the custom Shield shown in place of a blocked app or an app in a blocked category: it names the Focus Session holding the block, the approximate time left and a motivational line, read from the local snapshot in the App Group. It collects nothing and performs no network access.
 
 **ShieldAction, `io.disruption.focal.Focal.ShieldAction`.**
 
@@ -179,7 +179,7 @@ Common preamble to include in each request:
 ### 2.3 App Privacy (App Store Connect "Nutrition label")
 
 - **Data Not Collected.** Select "No, we do not collect data from this app".
-- Rationale for the human: no analytics, no accounts, no network calls, no third-party SDKs that collect; Screen Time selections are opaque tokens kept on the device and never read by Focal as app names or identifiers.
+- Rationale for the human: no analytics, no accounts, no network calls, no third-party SDKs that collect; app and category selections are opaque tokens kept on the device and never read by Focal as app names or identifiers; website entries are domains the user typed, stored on the device only.
 - Human to confirm: no tracking, no data linked to the user, and that the release build links no SDK that collects data.
 - Privacy policy URL: `<privacy policy URL>`.
 

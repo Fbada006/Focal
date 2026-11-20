@@ -21,12 +21,14 @@ This data never leaves your device through Focal. If you delete Focal, this data
 
 **Android.** Focal uses an accessibility service, which you turn on yourself in system settings. While a Focus Session runs, the service notices which app is in the foreground so Focal can show the Shield over apps you blocked. In supported browsers it reads only the address bar, to see which website is open. It does not read page content, messages, passwords or anything you type elsewhere. This information is compared with your Block List on the device and then discarded. It is not saved, sent or shared.
 
-**iOS.** Focal uses Apple's Screen Time frameworks (FamilyControls, ManagedSettings, DeviceActivity) with your approval. The apps, categories and websites you pick come back to Focal as opaque tokens that stay on your device; Focal cannot see which apps you used or for how long beyond what you configure it to block.
+**iOS.** Focal uses Apple's Screen Time frameworks (FamilyControls, ManagedSettings, DeviceActivity) with your approval. The apps and App Categories you pick in Apple's picker come back to Focal as opaque tokens that stay on your device; Focal cannot tell which apps they are, or which apps you used or for how long. Websites are different: you type them as domain names (for example `example.com`), so Focal stores those readable domains in your Block Lists, on your device only, and hands them to Screen Time to block.
 
 ## Permissions
 
 - **Accessibility (Android):** to detect blocked apps and websites, as above.
-- **Notifications:** to show the running Focus Session and tell you if a Locked session was Broken. No marketing notifications.
+- **Notifications (Android):** to show the running Focus Session and tell you if a Locked session was Broken.
+- **Notifications (iOS):** only so that tapping "Open Focal" on the Shield can show a notification you tap to return to Focal.
+- No marketing notifications on either platform.
 - **Exact alarms (Android):** to start and end your Schedules on time.
 - **Screen Time access (iOS):** to block the apps and websites you choose.
 
