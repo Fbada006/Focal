@@ -4,11 +4,13 @@
     content, let Focal read supported browsers' address bars (T26, ADR 0005). packageNames is left
     unset because app detection needs every package; the service drops content and text events from
     anything but a supported browser straight away (SupportedBrowsers in shared/core).
+    flagRetrieveInteractiveWindows lets the service see which app window is in front underneath its
+    own Shield overlay, so a late browser event can't replace a Shielded app (BrowserWindow).
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewTextChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagDefault|flagReportViewIds"
+    android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_description"
     android:notificationTimeout="50" />

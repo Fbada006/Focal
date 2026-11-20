@@ -84,34 +84,69 @@ class CommittedSite {
 }
 
 /**
- * Whether an event from a supported browser can be trusted, given which package owns the active
- * window. Accessibility events arrive late and from windows in the background, so only the active
- * window says what is really in front.
+ * Whether an event from a supported browser can be trusted, given which app owns the foreground
+ * window. Accessibility events arrive late and from windows in the background, so only the
+ * foreground window says what is really in front.
  */
 enum class BrowserWindow {
-    /** The browser is the active window: read its address bar. */
+    /** The browser owns the foreground window: read its address bar. */
     Active,
 
-    /**
-     * The active window can't say what is in front: no root yet (views not laid out), or Focal's
-     * own Shield is on top. Take the browser's word for now.
-     */
+    /** The foreground window is unknown (views not laid out yet) and nothing is Shielded: take the browser's word for now. */
     NotReady,
 
-    /** Another app owns the active window: the event is stale or from the background, ignore it. */
+    /**
+     * The foreground window is unknown while another app is Shielded. Keep that app and its Shield
+     * (lifting it needs proof the user left), and check the browser again shortly.
+     */
+    Unconfirmed,
+
+    /** Another app owns the foreground window: the event is stale or from the background, ignore it. */
     OtherApp,
     ;
 
     companion object {
         /**
-         * [activeWindowPackage] is null when there is no active window root yet; [focalPackage] is
-         * Focal's own, whose Shield window becomes the active window while shown.
+         * [foregroundApp] is the package of the app window in front, underneath Focal's own Shield
+         * (which is an overlay, not an app window), or null when it can't be read yet.
+         * [shieldedApp] is the app the Shield currently covers, if any.
          */
-        fun of(browser: String, activeWindowPackage: String?, focalPackage: String): BrowserWindow =
-            when (activeWindowPackage) {
-                null, focalPackage -> NotReady
+        fun of(browser: String, foregroundApp: String?, shieldedApp: String?): BrowserWindow =
+            when (foregroundApp) {
                 browser -> Active
+                null -> if (shieldedApp != null && shieldedApp != browser) Unconfirmed else NotReady
                 else -> OtherApp
             }
+    }
+}
+
+/**
+ * The one address-bar check waiting to run (content changes arrive many times a second, so checks
+ * are throttled). A background browser's event must not replace the foreground browser's check,
+ * or the page it just opened would never be read.
+ */
+class PendingAddressBarCheck {
+    /** The browser whose address bar is due a check, or null when none is pending. */
+    var browser: String? = null
+        private set
+
+    /**
+     * An event from [browser], classified by [BrowserWindow.of]. Returns true when a check for
+     * [browser] must now be scheduled (replacing any pending one); false when the event is ignored
+     * or a check for it is already pending.
+     */
+    fun offer(browser: String, window: BrowserWindow): Boolean {
+        if (window == BrowserWindow.OtherApp || browser == this.browser) return false
+        // Only a browser known to be in front may take over another browser's pending check.
+        if (this.browser != null && window != BrowserWindow.Active) return false
+        this.browser = browser
+        return true
+    }
+
+    /** The check is running: return its browser and clear it. */
+    fun take(): String? = browser.also { browser = null }
+
+    fun clear() {
+        browser = null
     }
 }

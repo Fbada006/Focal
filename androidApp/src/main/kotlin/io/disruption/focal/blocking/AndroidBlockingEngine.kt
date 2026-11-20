@@ -69,6 +69,9 @@ class AndroidBlockingEngine(
     /** What the Shield should show over the current foreground app, or null to hide it. */
     val shield: StateFlow<ShieldContent?> = _shield.asStateFlow()
 
+    /** The foreground app the Shield covers right now, or null when nothing is Shielded. */
+    val shieldedApp: String? get() = synchronized(shieldLock) { foreground.value?.packageName?.takeIf { _shield.value != null } }
+
     /**
      * The accessibility service reports each foreground package; null means "left the app". For a
      * supported browser, [host] is the committed site its address bar shows, if any (T26).

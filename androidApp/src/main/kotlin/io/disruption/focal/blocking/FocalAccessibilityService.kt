@@ -7,12 +7,14 @@ import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import io.disruption.focal.FocalApplication
 import io.disruption.focal.MainActivity
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.website.AddressBarReading
 import io.disruption.focal.core.website.BrowserWindow
 import io.disruption.focal.core.website.CommittedSite
+import io.disruption.focal.core.website.PendingAddressBarCheck
 import io.disruption.focal.core.website.SupportedBrowsers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,11 +42,9 @@ class FocalAccessibilityService : AccessibilityService() {
     private val site = CommittedSite()
     private val handler = Handler(Looper.getMainLooper())
 
-    /** The browser whose address bar is due a check, or null when none is pending. */
-    private var pendingCheck: String? = null
+    private val pendingCheck = PendingAddressBarCheck()
     private val runPendingCheck = Runnable {
-        val browser = pendingCheck ?: return@Runnable
-        pendingCheck = null
+        val browser = pendingCheck.take() ?: return@Runnable
         checkAddressBar(browser)
     }
 
@@ -86,7 +86,9 @@ class FocalAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> onWindowChanged(engine, packageName, event.className)
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
             AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
-            -> if (SupportedBrowsers.isSupported(packageName)) scheduleAddressBarCheck(packageName)
+            -> if (SupportedBrowsers.isSupported(packageName)) {
+                scheduleAddressBarCheck(packageName, browserWindow(packageName, foregroundAppRoot()))
+            }
         }
     }
 
@@ -99,36 +101,56 @@ class FocalAccessibilityService : AccessibilityService() {
         if (noise.isTransient(packageName)) return
         // Leaving the app (launcher, Settings) or returning to Focal lifts the Shield.
         if (noise.isLeaving(packageName)) {
+            forgetBrowser()
             engine.onForeground(null)
             return
         }
         if (!SupportedBrowsers.isSupported(packageName)) {
-            site.reset()
-            cancelAddressBarCheck()
+            forgetBrowser()
             engine.onForeground(packageName)
             return
         }
         // The new window's views may not be laid out yet: check now, and again once they settle.
-        // A late event from a browser that is no longer the active window must not replace the app
-        // really in front (and its Shield), so it is ignored.
-        when (checkAddressBar(packageName)) {
-            BrowserWindow.Active, BrowserWindow.OtherApp -> Unit
-            BrowserWindow.NotReady -> engine.onForeground(packageName, site.update(packageName, null))
-        }
-        scheduleAddressBarCheck(packageName)
+        // A late event from a browser that is not the foreground app must not replace the app
+        // really in front (or its Shield), so it is ignored ([BrowserWindow]).
+        val window = checkAddressBar(packageName)
+        if (window == BrowserWindow.NotReady) engine.onForeground(packageName, site.update(packageName, null))
+        scheduleAddressBarCheck(packageName, window)
+    }
+
+    /** The user left the browser: its site and pending check no longer describe what is in front. */
+    private fun forgetBrowser() {
+        site.reset()
+        cancelAddressBarCheck()
     }
 
     /**
      * Read [browser]'s address bar and report the committed site to the engine, but only when
-     * [browser] is the active window; otherwise do nothing and say why ([BrowserWindow]).
+     * [browser] is the foreground app; otherwise do nothing and say why ([BrowserWindow]).
      */
     private fun checkAddressBar(browser: String): BrowserWindow {
-        val root = rootInActiveWindow
-        val window = BrowserWindow.of(browser, root?.packageName?.toString(), packageName)
+        val root = foregroundAppRoot()
+        val window = browserWindow(browser, root)
         if (window == BrowserWindow.Active && root != null) {
             engine?.onForeground(browser, site.update(browser, readAddressBar(root, browser)))
         }
         return window
+    }
+
+    private fun browserWindow(browser: String, foregroundRoot: AccessibilityNodeInfo?): BrowserWindow =
+        BrowserWindow.of(browser, foregroundRoot?.packageName?.toString(), engine?.shieldedApp)
+
+    /**
+     * The root of the app window in front, looking underneath Focal's Shield: the Shield is an
+     * accessibility overlay and becomes the active window while shown, so the active window alone
+     * can't say which app it covers. Null when no app window can be read yet.
+     */
+    private fun foregroundAppRoot(): AccessibilityNodeInfo? {
+        val apps = runCatching { windows }.getOrNull().orEmpty()
+            .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val window = apps.firstOrNull { it.isActive } ?: apps.maxByOrNull { it.layer }
+        return window?.root
+            ?: rootInActiveWindow?.takeUnless { it.packageName?.toString() == packageName }
     }
 
     private fun readAddressBar(root: AccessibilityNodeInfo, browser: String): AddressBarReading? {
@@ -140,16 +162,18 @@ class FocalAccessibilityService : AccessibilityService() {
         return null
     }
 
-    /** Content changes arrive many times a second: read the bar at most once per delay, after it. */
-    private fun scheduleAddressBarCheck(browser: String) {
-        if (pendingCheck == browser) return
-        cancelAddressBarCheck()
-        pendingCheck = browser
+    /**
+     * Content changes arrive many times a second: read the bar at most once per delay, after it.
+     * Which event may (re)schedule the check is [PendingAddressBarCheck]'s rule.
+     */
+    private fun scheduleAddressBarCheck(browser: String, window: BrowserWindow) {
+        if (!pendingCheck.offer(browser, window)) return
+        handler.removeCallbacks(runPendingCheck)
         handler.postDelayed(runPendingCheck, ADDRESS_BAR_CHECK_DELAY_MS)
     }
 
     private fun cancelAddressBarCheck() {
-        pendingCheck = null
+        pendingCheck.clear()
         handler.removeCallbacks(runPendingCheck)
     }
 
