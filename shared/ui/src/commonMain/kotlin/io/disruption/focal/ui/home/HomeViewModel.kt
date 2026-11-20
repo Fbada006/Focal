@@ -100,7 +100,7 @@ class HomeViewModel(
         when (intent) {
             HomeIntent.StartClicked -> if (currentState.canStart) emit(HomeEffect.OpenStart)
             HomeIntent.Resumed -> refreshPermissions()
-            HomeIntent.BrokenWarningDismissed -> sessions.acknowledgeBroken()
+            HomeIntent.BrokenWarningDismissed -> viewModelScope.launch { sessions.acknowledgeBroken() }
             is HomeIntent.FixPermissionClicked -> permissions.request(intent.permission)
             HomeIntent.BlockListsClicked -> emit(HomeEffect.OpenBlockLists)
             HomeIntent.SchedulesClicked -> emit(HomeEffect.OpenSchedules)

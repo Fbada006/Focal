@@ -58,4 +58,10 @@ class InMemoryAppPreferences(onboardingCompleted: Boolean = false) : AppPreferen
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         this.completed.value = completed
     }
+
+    private val brokenSeenUntil = MutableStateFlow<Instant?>(null)
+    override val brokenWarningsSeenUntil: Flow<Instant?> = brokenSeenUntil
+    override suspend fun setBrokenWarningsSeenUntil(seenUntil: Instant) {
+        brokenSeenUntil.value = seenUntil
+    }
 }

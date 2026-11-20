@@ -15,13 +15,12 @@ import kotlinx.datetime.TimeZone
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.core.permissions.Permission
+import io.disruption.focal.core.repository.AppPreferences
 import io.disruption.focal.core.repository.BlockListRepository
 import io.disruption.focal.core.repository.FocusSessionRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -44,6 +43,7 @@ class FocusSessionService(
     private val sessions: FocusSessionRepository,
     private val engine: BlockingEngine,
     private val clock: Clock,
+    private val preferences: AppPreferences,
     private val newId: () -> String = ::randomId,
     lock: SessionLock = SessionLock(),
 ) {
@@ -52,18 +52,26 @@ class FocusSessionService(
     /** Exit Countdowns in progress, by session. Held in memory: leaving the countdown cancels it. */
     private val countdowns = mutableMapOf<FocusSessionId, ExitCountdown>()
 
-    private val unacknowledgedBroken = MutableStateFlow<List<FocusSession>>(emptyList())
-
     /**
-     * Sessions recorded as Broken since this process started that the user hasn't acknowledged, so
-     * whichever check noticed the revocation, the UI can still warn about it (story 41).
+     * Sessions recorded as Broken that the user hasn't acknowledged yet, oldest first, so whichever
+     * check noticed the revocation, the UI can still warn about it (story 41). The acknowledgement
+     * is stored, so a warning survives Focal's process dying before Home is opened.
      */
-    val brokenToAcknowledge: StateFlow<List<FocusSession>> = unacknowledgedBroken.asStateFlow()
+    val brokenToAcknowledge: Flow<List<FocusSession>> =
+        combine(sessions.observeAll(), preferences.brokenWarningsSeenUntil) { all, seenUntil ->
+            unacknowledged(all, seenUntil)
+        }
 
-    /** The user has seen the warning for [brokenToAcknowledge]. */
-    fun acknowledgeBroken() {
-        unacknowledgedBroken.value = emptyList()
+    /** The user has seen the warning for every session [brokenToAcknowledge] lists now. */
+    suspend fun acknowledgeBroken() {
+        val seenUntil = preferences.brokenWarningsSeenUntil.first()
+        val latest = unacknowledged(sessions.observeAll().first(), seenUntil).lastOrNull()?.endedAt ?: return
+        preferences.setBrokenWarningsSeenUntil(latest)
     }
+
+    private fun unacknowledged(all: List<FocusSession>, seenUntil: Instant?): List<FocusSession> = all
+        .filter { it.outcome == Outcome.Broken && it.endedAt != null && (seenUntil == null || it.endedAt > seenUntil) }
+        .sortedBy { it.endedAt }
 
     /** Running sessions, ordered by planned end. */
     val running: Flow<List<FocusSession>> = sessions.observeRunning()
@@ -300,11 +308,9 @@ class FocusSessionService(
     suspend fun markBlockingDefeated(): List<FocusSession> = mutex.withLock {
         completeDueLocked()
         val now = clock.now()
-        val broken = sessions.getRunning()
+        sessions.getRunning()
             .filter { it.strictness == Strictness.Locked }
             .map { finish(it, Outcome.Broken, now) }
-        if (broken.isNotEmpty()) unacknowledgedBroken.update { it + broken }
-        broken
     }
 
     /**

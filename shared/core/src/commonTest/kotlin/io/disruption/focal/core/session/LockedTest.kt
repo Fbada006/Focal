@@ -3,6 +3,7 @@ package io.disruption.focal.core.session
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.core.permissions.Permission
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -88,13 +89,39 @@ class LockedTest {
     @Test
     fun brokenSessionsWaitToBeAcknowledged() = runTest {
         val locked = f.startFor(1.hours, strictness = Strictness.Locked)
-        assertTrue(f.service.brokenToAcknowledge.value.isEmpty())
+        assertTrue(f.service.brokenToAcknowledge.first().isEmpty())
 
         f.service.checkPermissions(listOf(Permission.AccessibilityService))
-        assertEquals(listOf(locked.id), f.service.brokenToAcknowledge.value.map { it.id })
+        assertEquals(listOf(locked.id), f.service.brokenToAcknowledge.first().map { it.id })
 
         f.service.acknowledgeBroken()
-        assertTrue(f.service.brokenToAcknowledge.value.isEmpty())
+        assertTrue(f.service.brokenToAcknowledge.first().isEmpty())
+    }
+
+    @Test
+    fun anUnacknowledgedWarningSurvivesAProcessRestart() = runTest {
+        // Notifications off, and Focal's process dies after recording Broken but before Home opens.
+        val locked = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+
+        val restarted = f.newService()
+        assertEquals(listOf(locked.id), restarted.brokenToAcknowledge.first().map { it.id })
+
+        restarted.acknowledgeBroken()
+        assertTrue(f.newService().brokenToAcknowledge.first().isEmpty())
+    }
+
+    @Test
+    fun aSessionBrokenAfterTheLastDismissalIsWarnedAbout() = runTest {
+        f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.AccessibilityService))
+        f.service.acknowledgeBroken()
+        f.clock.advanceBy(1.minutes)
+
+        val second = f.startFor(1.hours, strictness = Strictness.Locked)
+        f.service.checkPermissions(listOf(Permission.ScreenTime))
+
+        assertEquals(listOf(second.id), f.service.brokenToAcknowledge.first().map { it.id })
     }
 
     @Test

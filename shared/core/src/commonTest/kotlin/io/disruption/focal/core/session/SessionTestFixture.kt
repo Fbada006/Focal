@@ -6,6 +6,7 @@ import io.disruption.focal.core.model.BlockedSet
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.testing.FakeClock
+import io.disruption.focal.testing.InMemoryAppPreferences
 import io.disruption.focal.testing.InMemoryBlockListRepository
 import io.disruption.focal.testing.InMemoryFocusSessionRepository
 import io.disruption.focal.testing.RecordingBlockingEngine
@@ -30,7 +31,11 @@ class SessionTestFixture(vararg lists: BlockList = arrayOf(socialList, newsList)
     val sessions = InMemoryFocusSessionRepository()
     val engine = RecordingBlockingEngine()
     private var nextId = 0
-    val service = FocusSessionService(blockLists, sessions, engine, clock, newId = { "s${++nextId}" })
+    val preferences = InMemoryAppPreferences()
+    val service = newService()
+
+    /** Another service over the same repositories, as after Focal's process restarts. */
+    fun newService() = FocusSessionService(blockLists, sessions, engine, clock, preferences, newId = { "s${++nextId}" })
 
     suspend fun startFor(
         duration: Duration,
