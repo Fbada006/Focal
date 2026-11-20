@@ -30,6 +30,16 @@ class BlockingState(private val sessions: List<FocusSession>) {
     fun forWebsite(host: String, now: Instant): ShieldContent? =
         shieldFor(now) { it.blocked.blocksWebsite(host) }
 
+    /**
+     * The next moment what is blocked changes on its own: the soonest planned end or Break end
+     * after [now], or null when nothing is running. Platforms wake up then to refresh the Shield
+     * and the running-session notification (T19).
+     */
+    fun nextChange(now: Instant): Instant? = sessions
+        .filter { it.isRunning && it.plannedEnd > now }
+        .flatMap { listOfNotNull(it.plannedEnd, it.currentBreak(now)?.endsAt) }
+        .minOrNull()
+
     private fun shieldFor(now: Instant, matches: (FocusSession) -> Boolean): ShieldContent? {
         val blocking = sessions.filter { session ->
             session.isRunning &&

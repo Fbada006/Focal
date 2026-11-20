@@ -110,4 +110,24 @@ class BlockingStateTest {
             state.forApp("com.example.app", null, now + 1.minutes)?.motivationalLine,
         )
     }
+
+    @Test
+    fun theNextChangeIsTheSoonestSessionEndOrBreakEnd() {
+        val onBreak = session(
+            "s1",
+            endIn = 30.minutes,
+            breaks = listOf(Break(startedAt = now - 1.minutes, endsAt = now + 4.minutes)),
+        )
+        val other = session("s2", endIn = 10.minutes)
+
+        assertEquals(now + 4.minutes, BlockingState(listOf(onBreak, other)).nextChange(now))
+        // Once the Break is over, the next change is the soonest planned end.
+        assertEquals(now + 10.minutes, BlockingState(listOf(onBreak, other)).nextChange(now + 4.minutes))
+    }
+
+    @Test
+    fun thereIsNoNextChangeWhenNothingRuns() {
+        assertNull(BlockingState(emptyList()).nextChange(now))
+        assertNull(BlockingState(listOf(session("s1", endIn = -1.minutes))).nextChange(now))
+    }
 }

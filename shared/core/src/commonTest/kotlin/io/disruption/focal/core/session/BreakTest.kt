@@ -1,5 +1,6 @@
 package io.disruption.focal.core.session
 
+import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.Strictness
 import kotlinx.coroutines.test.runTest
@@ -90,5 +91,21 @@ class BreakTest {
 
         assertTrue(session.id in f.engine.applied)
         assertEquals(f.stored(session).breaks.single().endsAt, f.engine.pausedUntil[session.id])
+    }
+
+    @Test
+    fun restoreAfterTheBreakEndedBlocksAgain() = runTest {
+        val session = f.startFor(1.hours, strictness = Strictness.Delayed)
+        f.service.takeBreak(session.id)
+        // Focal's process died during the Break and came back after it ended.
+        f.engine.applied.clear()
+        f.engine.pausedUntil.clear()
+        f.clock.advanceBy(FocusSession.BREAK_LENGTH + 1.minutes)
+
+        f.service.restore()
+
+        assertTrue(session.id in f.engine.applied)
+        assertTrue(session.id !in f.engine.pausedUntil)
+        assertTrue(f.stored(session).isRunning)
     }
 }
