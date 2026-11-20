@@ -10,6 +10,9 @@ import io.disruption.focal.core.session.SessionTestFixture
 import io.disruption.focal.core.session.socialList
 import io.disruption.focal.core.time.TimeZoneProvider
 import io.disruption.focal.testing.InMemoryScheduleRepository
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.DayOfWeek.MONDAY
 import kotlinx.datetime.DayOfWeek.TUESDAY
@@ -97,6 +100,24 @@ class ScheduleWakeUpTest {
         f.clock.now = Instant.parse("2026-01-06T10:00:00Z")
         // Catch-up would start nothing, so waking now would only loop: wait for next week's start.
         assertEquals(Instant.parse("2026-01-13T09:00:00Z"), service.nextWakeUp())
+    }
+
+    @Test
+    fun fillingAnEmptyBlockListDuringItsWindowWakesNow() = runTest {
+        service.create(tuesdayWork)
+        f.blockLists.save(socialList.copy(blocked = BlockedSet()))
+        f.clock.now = Instant.parse("2026-01-06T10:00:00Z")
+        val changes = mutableListOf<Unit>()
+        val watching = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            service.wakeUpChanges().toList(changes)
+        }
+        assertEquals(1, changes.size)
+
+        // The skipped window becomes due once the Block List has something to block.
+        f.blockLists.save(socialList)
+        assertEquals(2, changes.size, "a Block List change asks the platform to re-arm")
+        assertEquals(f.clock.now, service.nextWakeUp())
+        watching.cancel()
     }
 
     @Test

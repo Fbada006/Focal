@@ -10,6 +10,7 @@ import io.disruption.focal.core.repository.ScheduleRepository
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.core.time.TimeZoneProvider
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
 import kotlin.time.Instant
@@ -92,6 +93,14 @@ class ScheduleService(
 
     /** When to wake Focal next for a Schedule start or a session end; see [FocusSessionService.nextWakeUp]. */
     suspend fun nextWakeUp(): Instant? = sessions.nextWakeUp(schedules.getAll(), timeZone.current())
+
+    /**
+     * Emits whenever [nextWakeUp] may have moved, so the platform re-arms its alarm: a Schedule, a
+     * Block List or the running sessions changed. Block Lists count because a Schedule window on an
+     * empty Block List is skipped; adding an app or domain during that window makes it due now.
+     */
+    fun wakeUpChanges(): Flow<Unit> =
+        combine(schedules.observeAll(), blockLists.observeAll(), sessions.running) { _, _, _ -> }
 
     private suspend fun save(id: ScheduleId, draft: ScheduleDraft): ScheduleSaveResult {
         val name = draft.name.trim()

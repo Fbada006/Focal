@@ -14,7 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -90,12 +89,11 @@ class FocalApplication : Application() {
         alarms.arm(schedules.nextWakeUp())
     }
 
-    /** Any change to Schedules or running sessions can move the next wake-up, so re-arm on each. */
+    /** Any change to Schedules, Block Lists or running sessions can move the next wake-up: re-arm on each. */
     private fun keepScheduleAlarmArmed() {
         val schedules = koin.get<ScheduleService>()
         scope.launch {
-            combine(schedules.observeAll(), koin.get<FocusSessionService>().running) { _, _ -> }
-                .collectLatest { runCatching { armNextWakeUp(schedules) } }
+            schedules.wakeUpChanges().collectLatest { runCatching { armNextWakeUp(schedules) } }
         }
     }
 
