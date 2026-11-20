@@ -104,6 +104,20 @@ class HomeBreaksTest : MainDispatcherTest() {
     }
 
     @Test
+    fun aBreakThatCantBeScheduledIsRefusedAndSaysSo() = runTest {
+        f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Delayed)
+        f.engine.canScheduleBreakEnds = false
+        val vm = HomeViewModel(f.sessions, f.clock, f.permissions, ticks)
+
+        vm.onIntent(HomeIntent.TakeBreakClicked("s1"))
+
+        assertEquals("s1", vm.state.value.breakUnavailableFor)
+        val row = vm.state.value.running.single()
+        assertEquals(null, row.onBreak)
+        assertEquals(3, row.breaksLeft)
+    }
+
+    @Test
     fun breaksAreNotOfferedForNormalOrLockedSessions() = runTest {
         f.sessions.start(social.id, SessionLength.For(1.hours), Strictness.Normal)
         f.sessions.start(social.id, SessionLength.For(2.hours), Strictness.Locked)

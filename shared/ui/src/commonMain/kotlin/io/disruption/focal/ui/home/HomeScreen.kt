@@ -105,6 +105,7 @@ fun HomeScreen(
                 items(state.running, key = { it.id }) { row ->
                     RunningSessionCard(
                         row = row,
+                        breakUnavailable = state.breakUnavailableFor == row.id,
                         onEnd = { onIntent(HomeIntent.EndClicked(row.id)) },
                         onTakeBreak = { onIntent(HomeIntent.TakeBreakClicked(row.id)) },
                         onEdit = { onIntent(HomeIntent.EditClicked(row.id)) },
@@ -122,6 +123,7 @@ fun HomeScreen(
 @Composable
 private fun RunningSessionCard(
     row: RunningSessionRow,
+    breakUnavailable: Boolean,
     onEnd: () -> Unit,
     onTakeBreak: () -> Unit,
     onEdit: () -> Unit,
@@ -147,6 +149,13 @@ private fun RunningSessionCard(
                 )
             }
             row.onBreak?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            if (breakUnavailable) {
+                Text(
+                    "Couldn't start the Break: Focal can't make sure blocking comes back when it ends. Your session is still blocking.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             row.breaksLeft?.let { left ->
                 Text(
                     "${if (left == 1) "1 Break" else "$left Breaks"} left",

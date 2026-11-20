@@ -108,4 +108,30 @@ class BreakTest {
         assertTrue(session.id !in f.engine.pausedUntil)
         assertTrue(f.stored(session).isRunning)
     }
+
+    @Test
+    fun noBreakWhenTheEngineCantScheduleItsEnd() = runTest {
+        val session = f.startFor(1.hours, strictness = Strictness.Delayed)
+        f.engine.canScheduleBreakEnds = false
+
+        assertEquals(BreakResult.Unavailable, f.service.takeBreak(session.id))
+
+        assertTrue(f.stored(session).breaks.isEmpty(), "the Break is taken back")
+        assertEquals(3, f.stored(session).breaksLeft)
+        assertTrue(f.engine.isAppBlocked("com.instagram.android"), "the session keeps blocking")
+    }
+
+    @Test
+    fun aBreakWhoseEndCanNoLongerBeScheduledEndsOnRestore() = runTest {
+        val session = f.startFor(1.hours, strictness = Strictness.Delayed)
+        f.service.takeBreak(session.id)
+        f.clock.advanceBy(2.minutes)
+        f.engine.canScheduleBreakEnds = false
+
+        f.service.restore()
+
+        assertEquals(f.clock.now, f.stored(session).breaks.single().endsAt, "the Break is over now")
+        assertEquals(null, f.stored(session).currentBreak(f.clock.now))
+        assertTrue(session.id !in f.engine.pausedUntil)
+    }
 }

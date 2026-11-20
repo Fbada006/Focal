@@ -48,6 +48,13 @@ sealed interface BreakResult {
     data class NotAllowed(val strictness: Strictness) : BreakResult
     data object NoBreaksLeft : BreakResult
     data object AlreadyOnBreak : BreakResult
+
+    /**
+     * The platform couldn't arrange for blocking to come back when the Break ends
+     * ([io.disruption.focal.core.blocking.BlockingEngine.pauseUntil] returned false), so no Break was
+     * taken and the session keeps blocking.
+     */
+    data object Unavailable : BreakResult
 }
 
 sealed interface EditResult {

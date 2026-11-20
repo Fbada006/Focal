@@ -1,19 +1,23 @@
 package io.disruption.focal.core.ios
 
 import io.disruption.focal.core.model.Break
+import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.session.BreakResult
 import io.disruption.focal.core.session.SessionTestFixture
 import io.disruption.focal.core.session.socialList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 private val socialApps = socialList.blocked.apps.toList()
@@ -83,6 +87,55 @@ class IosContractTest {
     fun anEventLogFromANewerVersionOrGarbageYieldsNothing() {
         assertTrue(IosContract.decodeEvents("""{"version": 2, "events": []}""").isEmpty())
         assertTrue(IosContract.decodeEvents("not json").isEmpty())
+    }
+
+    @Test
+    fun compactingDropsOnlyTheIngestedEvents() {
+        val ingested = """
+            {"version": 1, "events": [
+              {"type": "somethingNew", "id": "x", "at": "2026-01-05T09:00:00Z"},
+              {"type": "breakEnded", "id": "ev-2", "at": "not a time", "sessionId": "fs-2"},
+              {"type": "breakEnded", "id": "ev-3", "at": "2026-01-05T10:00:00Z", "sessionId": "fs-2"}
+            ]}
+        """.trimIndent()
+        // The extension appended ev-4 after the app read the log.
+        val current = ingested.replace(
+            "\"fs-2\"}\n]}",
+            "\"fs-2\"},\n{\"type\": \"breakEnded\", \"id\": \"ev-4\", \"at\": \"2026-01-05T11:00:00Z\", \"sessionId\": \"fs-2\"}\n]}",
+        )
+
+        val compacted = IosContract.withoutIngested(current, ingested)!!
+
+        assertEquals(
+            listOf(ExtensionEvent.BreakEnded("ev-4", Instant.parse("2026-01-05T11:00:00Z"), "fs-2")),
+            IosContract.decodeEvents(compacted),
+        )
+        // The unknown and malformed entries are kept for a version that understands them.
+        assertTrue("\"somethingNew\"" in compacted)
+        assertTrue("\"not a time\"" in compacted)
+        assertNull(IosContract.withoutIngested(compacted, ingested))
+    }
+
+    @Test
+    fun aLogWithNothingIngestedOrFromANewerVersionIsLeftAlone() {
+        val log = IosContract.encodeEvents(ContractSamples.events)
+        assertNull(IosContract.withoutIngested(log, IosContract.encodeEvents(ExtensionEventLog())))
+        assertNull(IosContract.withoutIngested(log.replaceFirst("\"version\": 1", "\"version\": 2"), log))
+        assertNull(IosContract.withoutIngested("not json", log))
+    }
+
+    @Test
+    fun aCompactedLogIngestsToTheSameState() = runTest {
+        val f = SessionTestFixture()
+        val log = IosContract.encodeEvents(ExtensionEventLog(events = listOf(scheduleStart(f.clock.now))))
+        ingestOnLaunch(f.service, log)
+
+        val compacted = IosContract.withoutIngested(log, log)!!
+        val report = ingestOnLaunch(f.service, compacted)
+
+        assertTrue(IosContract.decodeEvents(compacted).isEmpty())
+        assertEquals(0, report.sessionsStarted)
+        assertEquals(1, f.sessions.all.size)
     }
 
     @Test
@@ -197,6 +250,27 @@ class IosContractTest {
 
         assertEquals(0, report.breaksEnded)
         assertEquals(onBreak.breaks, f.sessions.get(FocusSessionId("fs-ios"))!!.breaks)
+    }
+
+    @Test
+    fun comingBackAfterTheMonitorEndedABreakKeepsTheSessionBlocking() = runTest {
+        // T20: the Break's DeviceActivity interval ended (a little early, to the minute) while Focal
+        // was suspended; Focal comes back to the foreground before the recorded Break end.
+        val f = SessionTestFixture()
+        val session = f.startFor(1.hours, strictness = Strictness.Delayed)
+        val breakEnd = assertIs<BreakResult.Started>(f.service.takeBreak(session.id)).endsAt
+        f.clock.advanceBy(FocusSession.BREAK_LENGTH - 30.seconds)
+        val log = IosContract.encodeEvents(
+            ExtensionEventLog(events = listOf(ExtensionEvent.BreakEnded("ev-b", breakEnd - 1.minutes, session.id.value))),
+        )
+
+        val report = ingestOnLaunch(f.service, log)
+
+        assertEquals(1, report.breaksEnded)
+        assertEquals(breakEnd - 1.minutes, f.sessions.get(session.id)!!.breaks.single().endsAt)
+        // Re-applied, and not paused again for what is left of the recorded Break.
+        assertTrue(session.id in f.engine.applied)
+        assertTrue(session.id !in f.engine.pausedUntil)
     }
 
     @Test
