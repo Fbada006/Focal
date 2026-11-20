@@ -89,7 +89,8 @@ class AndroidBlockingEngine(
         if (applied.value.isEmpty()) stopRunningService()
     }
 
-    override suspend fun pauseUntil(sessionId: FocusSessionId, until: Instant) {
+    /** The Shield checks the Break's end itself, so blocking comes back at [until]; this can't fail. */
+    override suspend fun pauseUntil(sessionId: FocusSessionId, until: Instant): Boolean {
         val now = clock.now()
         applied.update { sessions ->
             val session = sessions[sessionId] ?: return@update sessions
@@ -99,6 +100,7 @@ class AndroidBlockingEngine(
         }
         refreshShield()
         applied.value[sessionId]?.let(::scheduleRefreshes)
+        return true
     }
 
     private fun refreshShield() = synchronized(shieldLock) {

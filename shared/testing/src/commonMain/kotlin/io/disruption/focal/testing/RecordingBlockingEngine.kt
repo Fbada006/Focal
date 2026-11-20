@@ -36,9 +36,15 @@ class RecordingBlockingEngine : BlockingEngine {
         pausedUntil.remove(sessionId)
     }
 
-    override suspend fun pauseUntil(sessionId: FocusSessionId, until: Instant) {
+    /** False makes [pauseUntil] fail, as iOS does when it can't register a Break's end. */
+    var canScheduleBreakEnds = true
+
+    override suspend fun pauseUntil(sessionId: FocusSessionId, until: Instant): Boolean {
         calls += Call.Pause(sessionId, until)
+        // A failed pause leaves the session blocking, as the contract says.
+        if (!canScheduleBreakEnds) return false
         pausedUntil[sessionId] = until
+        return true
     }
 
     /** Whether any applied, unpaused session blocks [app], the union rule of ADR 0006. */

@@ -6,6 +6,7 @@ import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Strictness
 import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.core.permissions.PermissionGateway
+import io.disruption.focal.core.session.BreakResult
 import io.disruption.focal.core.session.FocusSessionService
 import io.disruption.focal.ui.mvi.MviViewModel
 import kotlinx.coroutines.delay
@@ -40,6 +41,8 @@ data class HomeState(
     val missingPermissions: List<Permission> = emptyList(),
     /** Until the first check returns, Start stays disabled rather than briefly looking available. */
     val permissionsChecked: Boolean = false,
+    /** The session whose last Break was refused because Focal couldn't schedule its end. */
+    val breakUnavailableFor: String? = null,
 ) {
     val canStart: Boolean get() = permissionsChecked && missingPermissions.isEmpty()
 }
@@ -96,7 +99,8 @@ class HomeViewModel(
             is HomeIntent.EndClicked -> end(intent.sessionId)
             is HomeIntent.EditClicked -> emit(HomeEffect.OpenEditSession(intent.sessionId))
             is HomeIntent.TakeBreakClicked -> viewModelScope.launch {
-                sessions.takeBreak(FocusSessionId(intent.sessionId))
+                val result = sessions.takeBreak(FocusSessionId(intent.sessionId))
+                setState { copy(breakUnavailableFor = intent.sessionId.takeIf { result == BreakResult.Unavailable }) }
             }
         }
     }

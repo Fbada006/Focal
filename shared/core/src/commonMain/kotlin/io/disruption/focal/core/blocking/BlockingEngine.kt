@@ -22,6 +22,11 @@ interface BlockingEngine {
     /** Stop blocking for the session. Other sessions keep their blocks. */
     suspend fun lift(sessionId: FocusSessionId)
 
-    /** Lift blocking for the session during a Break and restore it automatically at [until]. */
-    suspend fun pauseUntil(sessionId: FocusSessionId, until: Instant)
+    /**
+     * Lift blocking for the session during a Break and restore it automatically at [until], even if
+     * Focal isn't running then. Returns false, with the session still blocking, when the platform
+     * can't arrange that restore (on iOS, registering the Break's DeviceActivity interval failed):
+     * a Break that might never end must not start.
+     */
+    suspend fun pauseUntil(sessionId: FocusSessionId, until: Instant): Boolean
 }

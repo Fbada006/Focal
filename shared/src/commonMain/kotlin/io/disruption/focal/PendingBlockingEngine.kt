@@ -12,5 +12,5 @@ import kotlin.time.Instant
 class PendingBlockingEngine : BlockingEngine {
     override suspend fun apply(session: FocusSession) = Unit
     override suspend fun lift(sessionId: FocusSessionId) = Unit
-    override suspend fun pauseUntil(sessionId: FocusSessionId, until: Instant) = Unit
+    override suspend fun pauseUntil(sessionId: FocusSessionId, until: Instant) = true
 }

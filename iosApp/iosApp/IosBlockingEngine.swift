@@ -14,24 +14,48 @@ import Shared
 final class IosBlockingEngine: NSObject, BlockingEngine {
     func apply(session: FocusSession, completionHandler: @escaping (Error?) -> Void) {
         let blocked = session.blocked
-        // Re-applying replaces what this session blocks (additions while it runs).
-        FocalStore.apply(
-            apps: blocked.apps,
-            appCategories: blocked.appCategories,
-            domains: blocked.domains,
-            to: FocalStore.named(IosBlockingSupportKt.managedSettingsStoreName(session: session))
-        )
+        let sessionId = IosBlockingSupportKt.sessionIdString(sessionId: session.id)
+        let store = FocalStore.named(IosBlockingSupportKt.managedSettingsStoreName(session: session))
+        let applied = { (record: inout FocalAppliedSession?) in
+            // The record first, so the DeviceActivityMonitor re-applies this set at a Break's end. A
+            // Break in progress stays recorded: the session service pauses the session again next.
+            record = FocalAppliedSession(
+                apps: Array(blocked.apps),
+                appCategories: Array(blocked.appCategories),
+                domains: Array(blocked.domains),
+                plannedEnd: Self.date(session.plannedEnd),
+                breakEndsAt: record?.breakEndsAt
+            )
+            // Re-applying replaces what this session blocks (additions while it runs).
+            FocalStore.apply(
+                apps: blocked.apps,
+                appCategories: blocked.appCategories,
+                domains: blocked.domains,
+                to: store
+            )
+        }
+        if !FocalAppliedSessions.update(sessionId: sessionId, applied) {
+            // No shared record (no App Group): still block.
+            var none: FocalAppliedSession?
+            applied(&none)
+        }
         completionHandler(nil)
     }
 
-    /// A Break interval left registered here is harmless: the monitor finds the session gone from
-    /// the snapshot, or recorded as ended, and does nothing. Stopping it could itself end the
-    /// interval early. The session is recorded as ended before its store is cleared (see
-    /// `FocalEndedSessions`), so a monitor re-applying it at this moment clears it again.
+    /// A Break interval left registered here is harmless: when it ends the monitor finds no record
+    /// for the session and does nothing. Stopping it could itself end the interval early. Deleting
+    /// the record and clearing the store happen in one coordinated step (`FocalAppliedSessions`), so
+    /// the monitor can't re-apply the session in between.
     func lift(sessionId: Any, completionHandler: @escaping (Error?) -> Void) {
         let name = IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)
+        let id = IosBlockingSupportKt.sessionIdString(sessionId: sessionId)
         breakTimers.removeValue(forKey: name)?.cancel()
-        FocalEndedSessions.record(IosBlockingSupportKt.sessionIdString(sessionId: sessionId))
+        FocalEndedSessions.record(id)
+        FocalAppliedSessions.update(sessionId: id) { record in
+            record = nil
+            FocalStore.named(name).clearAllSettings()
+        }
+        // Cleared again outside the coordination, in case it couldn't run.
         FocalStore.named(name).clearAllSettings()
         completionHandler(nil)
     }
@@ -40,20 +64,37 @@ final class IosBlockingEngine: NSObject, BlockingEngine {
     /// re-applies it then, even while Focal isn't running. While Focal is open, a timer catches up at
     /// the Break's end too; and Focal re-applies running sessions whenever it comes to the
     /// foreground, in case neither fired.
-    func pauseUntil(sessionId: Any, until: KotlinInstant, completionHandler: @escaping (Error?) -> Void) {
+    ///
+    /// Reports false, leaving the session blocking, when nothing could bring blocking back with Focal
+    /// killed: the Break's interval couldn't be registered, or there is no shared record for the
+    /// monitor to re-apply. The session service then refuses the Break.
+    func pauseUntil(sessionId: Any, until: KotlinInstant, completionHandler: @escaping (KotlinBoolean?, Error?) -> Void) {
         let name = IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)
-        FocalStore.named(name).clearAllSettings()
-        let end = Date(timeIntervalSince1970: TimeInterval(until.toEpochMilliseconds()) / 1000)
+        let id = IosBlockingSupportKt.sessionIdString(sessionId: sessionId)
+        let end = Self.date(until)
         let activity = DeviceActivityName(IosBlockingSupportKt.breakActivityName(sessionId: sessionId))
         do {
             try Self.monitorBreak(activity, endingAt: end)
         } catch {
-            // Registering fails without Screen Time authorisation, when no store blocks anything
-            // anyway. The timer below and the foreground re-apply still end the Break.
             NSLog("Focal: couldn't register the Break's end for %@: %@", name, String(describing: error))
+            completionHandler(KotlinBoolean(bool: false), nil)
+            return
         }
-        catchUp(at: end, key: name)
-        completionHandler(nil)
+        var paused = false
+        FocalAppliedSessions.update(sessionId: id) { record in
+            guard record != nil else { return }
+            // The Break is recorded before the store is cleared, so the monitor (and anything reading
+            // the record) never sees a cleared store without the Break that explains it.
+            record?.breakEndsAt = end
+            FocalStore.named(name).clearAllSettings()
+            paused = true
+        }
+        if paused { catchUp(at: end, key: name) }
+        completionHandler(KotlinBoolean(bool: paused), nil)
+    }
+
+    private static func date(_ instant: KotlinInstant) -> Date {
+        Date(timeIntervalSince1970: TimeInterval(instant.toEpochMilliseconds()) / 1000)
     }
 
     /// Pending in-app Break ends, by store name. Taking or re-applying a Break replaces its timer.

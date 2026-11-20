@@ -202,7 +202,11 @@ class FocusSessionService(
         val endsAt = minOf(now + FocusSession.BREAK_LENGTH, session.plannedEnd)
         val updated = session.copy(breaks = session.breaks + Break(startedAt = now, endsAt = endsAt))
         sessions.save(updated)
-        engine.pauseUntil(id, endsAt)
+        if (!engine.pauseUntil(id, endsAt)) {
+            // Nothing would bring blocking back if Focal were killed now: take the Break back.
+            sessions.save(session)
+            return BreakResult.Unavailable
+        }
         BreakResult.Started(updated, endsAt)
     }
 
@@ -238,7 +242,7 @@ class FocusSessionService(
         if (updated != session) {
             sessions.save(updated)
             engine.apply(updated)
-            session.currentBreak(now)?.let { engine.pauseUntil(id, minOf(it.endsAt, newEnd)) }
+            session.currentBreak(now)?.let { continueBreak(updated, minOf(it.endsAt, newEnd), now) }
         }
         EditResult.Applied(updated)
     }
@@ -263,7 +267,7 @@ class FocusSessionService(
             val updated = session.copy(blocked = newBlocked)
             sessions.save(updated)
             engine.apply(updated)
-            session.currentBreak(now)?.let { engine.pauseUntil(session.id, it.endsAt) }
+            session.currentBreak(now)?.let { continueBreak(updated, it.endsAt, now) }
             if (!session.blocked.containsAll(newBlocked)) tightened += updated
         }
         BlockListChangeReport(tightened, deferred)
@@ -300,9 +304,9 @@ class FocusSessionService(
         val running = sessions.getRunning()
         running.forEach { session ->
             engine.apply(session)
-            session.currentBreak(now)?.let { engine.pauseUntil(session.id, it.endsAt) }
+            session.currentBreak(now)?.let { continueBreak(session, it.endsAt, now) }
         }
-        running
+        sessions.getRunning()
     }
 
     /**
@@ -362,6 +366,17 @@ class FocusSessionService(
             }
         }
         IngestReport(sessionsStarted = started, sessionsCompleted = ended, breaksEnded = breaksEnded)
+    }
+
+    /**
+     * Pause [session] again for the Break in progress, after re-applying it. If the engine can no
+     * longer arrange the Break's end, it keeps blocking, so the Break is recorded as over at [now].
+     */
+    private suspend fun continueBreak(session: FocusSession, until: Instant, now: Instant) {
+        if (engine.pauseUntil(session.id, until)) return
+        val current = sessions.get(session.id) ?: return
+        val ongoing = current.currentBreak(now) ?: return
+        sessions.save(current.copy(breaks = current.breaks.map { if (it == ongoing) it.copy(endsAt = now) else it }))
     }
 
     private suspend fun completeDueLocked(): List<FocusSession> {
