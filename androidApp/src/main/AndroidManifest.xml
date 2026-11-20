@@ -8,8 +8,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
-    <!-- Running Focus Sessions are re-applied after a reboot (T13). -->
+    <!-- Running Focus Sessions are re-applied, and Schedule alarms re-armed, after a reboot (T13, T30). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+        Schedules start and end on time with Focal closed (T30). SCHEDULE_EXACT_ALARM, not
+        USE_EXACT_ALARM: Play only allows USE_EXACT_ALARM for alarm-clock and calendar apps. The
+        user grants it in "Alarms & reminders" when creating a Schedule.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!-- Lets Focal list launchable apps without QUERY_ALL_PACKAGES (T12). -->
     <queries>
@@ -70,7 +77,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Blocks distracting apps during a user-started Focus Session and keeps its remaining time visible." />
+                android:value="Blocks distracting apps and websites during a Focus Session the user started or scheduled, and keeps its remaining time visible." />
         </service>
 
         <receiver
@@ -79,6 +86,17 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Schedule alarms, clock and time-zone changes, and exact alarms being granted (T30). -->
+        <receiver
+            android:name=".blocking.ScheduleAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
     </application>

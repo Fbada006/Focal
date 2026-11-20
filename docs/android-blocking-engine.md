@@ -76,6 +76,13 @@ Known gaps and risks:
   - An exact alarm would add a permission (`SCHEDULE_EXACT_ALARM`, asked only with the first Schedule) without blocking anything sooner.
 - **Schedules** use exact alarms: `setExactAndAllowWhileIdle` with `SCHEDULE_EXACT_ALARM`. Users can revoke this on Android 13+, so check `canScheduleExactAlarms()` and guide them back.
 - Re-register all alarms on `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED`.
+
+### Schedule alarms (T30)
+
+- One alarm (`ScheduleAlarms`) wakes Focal at `ScheduleService.nextWakeUp()`: the soonest next window start of a switched-on Schedule or planned end of a running session (manual ones too, so a session still ends on time if an OEM killed the process). If something is already due (a session past its end, or a window that began without its session, because time passed between a catch-up and the computation), it wakes at once rather than skipping to the next start. The rule lives in `shared/core` (`FocusSessionService.nextWakeUp`, `ScheduleWindows.nextStart`) with tests.
+- When it fires, `ScheduleAlarmReceiver` calls `ScheduleService.catchUp(missing)` with what `PermissionGateway.missing()` reports (`completeDueSessions`, then `checkPermissions`, then `evaluateSchedules`) and arms the next alarm. Without the accessibility service no Schedule session starts: it would block nothing, yet a Locked one could end Completed and count for the Streak. Running Locked sessions become Broken instead (T22), and an open window isn't treated as due, so the alarm doesn't fire again at once. When the service connects again (`onServiceConnected`), Focal catches up, starting what is left of an open window. iOS applies the same rule on launch. Starting a Schedule session goes through the engine's `apply`, which starts the foreground service as a manual start does; an exact alarm is an allowed trigger for that on Android 12+.
+- The alarm is re-armed whenever Schedules, Block Lists or running sessions change while Focal runs (`ScheduleService.wakeUpChanges`; a Schedule window skipped because its Block List was empty becomes due once the list has something to block), on every process start, on `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED` (`BootReceiver` → `restoreSessions`), on `TIMEZONE_CHANGED` and `TIME_SET` (Schedule times are wall-clock), and on `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED`. Computing the wake-up and setting the alarm happen under one lock (`FocalApplication.armNextWakeUp`), so a stale computation from one path can't replace a newer alarm from another. Each of these also catches up, so a start missed while the phone was off or the alarm was late starts then, for what is left of its window (T28).
+- Focal declares `SCHEDULE_EXACT_ALARM`, not `USE_EXACT_ALARM`: Play allows the latter only for alarm-clock and calendar apps. Without the permission (denied, or revoked, which also cancels the alarm) Focal falls back to an inexact `setAndAllowWhileIdle`: Doze may delay it, and the foreground service may not start from it, but blocking still works through the accessibility service.
 - **Persist active session state on disk** (Room or DataStore) so a restarted process resumes the active Focus Session instead of silently ending it. On-device only, per ADR 0003; no server sync in v1.
 
 ## 4. OEM battery killers
@@ -88,7 +95,7 @@ Known gaps and risks:
 
 1. **Accessibility service**: required before the first Focus Session, behind an in-app explanation screen (Play requires a prominent disclosure).
 2. **Notifications** (`POST_NOTIFICATIONS`, Android 13+): required; drives the foreground-service notification.
-3. **Exact alarms**: only when the first Schedule is created.
+3. **Exact alarms**: only when a Schedule is created, so the first Schedule is where it's asked. Saving the first Schedule (none existed before) without the permission shows why it's needed, with "Open alarm settings" (`ACTION_REQUEST_SCHEDULE_EXACT_ALARM`) or "Not now"; the Schedule is saved either way. Later Schedules and edits never ask, so "Not now" sticks; a revoked permission is surfaced by the fix-it banner instead.
 4. **Battery optimisation + OEM steps**: after the first session, and from a "Why did my session stop?" help entry.
 
 Missing required permissions disable starting a session and are shown with a fix-it action.

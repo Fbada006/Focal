@@ -5,6 +5,8 @@ import io.disruption.focal.core.blocklist.BlockListService
 import io.disruption.focal.core.model.BlockListId
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
+import io.disruption.focal.core.permissions.PermissionGateway
 import io.disruption.focal.core.schedule.ScheduleDraft
 import io.disruption.focal.core.schedule.ScheduleSaveResult
 import io.disruption.focal.core.schedule.ScheduleService
@@ -28,6 +30,8 @@ data class ScheduleEditorState(
     val enabled: Boolean = true,
     val errors: List<String> = emptyList(),
     val confirmingDelete: Boolean = false,
+    /** The new Schedule is saved; Focal is explaining why it needs exact alarms before closing. */
+    val askingForAlarms: Boolean = false,
 ) {
     val isOvernight: Boolean get() = end <= start
 }
@@ -43,17 +47,27 @@ sealed interface ScheduleEditorIntent {
     data object DeleteClicked : ScheduleEditorIntent
     data object DeleteConfirmed : ScheduleEditorIntent
     data object DeleteDismissed : ScheduleEditorIntent
+    data object AllowAlarmsClicked : ScheduleEditorIntent
+    data object AlarmsNotNowClicked : ScheduleEditorIntent
 }
 
 sealed interface ScheduleEditorEffect {
     data object Close : ScheduleEditorEffect
 }
 
-/** Create or edit a Schedule. Saving never weakens a session it already started (ADR 0007). */
+/**
+ * Create or edit a Schedule. Saving never weakens a session it already started (ADR 0007).
+ *
+ * Exact alarms are asked for only here, when the first Schedule is created without them (T30,
+ * docs/android-blocking-engine.md §5): that is the first moment Focal needs them. Later Schedules
+ * don't ask again, so "Not now" sticks. Platforms that don't need them (iOS) report them granted,
+ * so nothing is asked.
+ */
 class ScheduleEditorViewModel(
     scheduleId: String?,
     private val schedules: ScheduleService,
     blockLists: BlockListService,
+    private val permissions: PermissionGateway,
 ) : MviViewModel<ScheduleEditorState, ScheduleEditorIntent, ScheduleEditorEffect>(ScheduleEditorState()) {
     private val id = scheduleId?.let(::ScheduleId)
 
@@ -95,6 +109,11 @@ class ScheduleEditorViewModel(
             ScheduleEditorIntent.SaveClicked -> save()
             ScheduleEditorIntent.DeleteClicked -> setState { copy(confirmingDelete = true) }
             ScheduleEditorIntent.DeleteDismissed -> setState { copy(confirmingDelete = false) }
+            ScheduleEditorIntent.AllowAlarmsClicked -> {
+                permissions.request(Permission.ExactAlarms)
+                emit(ScheduleEditorEffect.Close)
+            }
+            ScheduleEditorIntent.AlarmsNotNowClicked -> emit(ScheduleEditorEffect.Close)
             ScheduleEditorIntent.DeleteConfirmed -> viewModelScope.launch {
                 id?.let { schedules.delete(it) }
                 emit(ScheduleEditorEffect.Close)
@@ -114,9 +133,13 @@ class ScheduleEditorViewModel(
             enabled = state.enabled,
         )
         viewModelScope.launch {
+            val isFirstSchedule = id == null && schedules.observeAll().first().isEmpty()
             val result = if (id == null) schedules.create(draft) else schedules.update(id, draft)
             when (result) {
-                is ScheduleSaveResult.Saved, ScheduleSaveResult.NotFound -> emit(ScheduleEditorEffect.Close)
+                is ScheduleSaveResult.Saved ->
+                    if (isFirstSchedule && !permissions.isGranted(Permission.ExactAlarms)) setState { copy(askingForAlarms = true) }
+                    else emit(ScheduleEditorEffect.Close)
+                ScheduleSaveResult.NotFound -> emit(ScheduleEditorEffect.Close)
                 is ScheduleSaveResult.Invalid ->
                     setState { copy(errors = result.problems.sortedBy { it.ordinal }.map { it.message() }) }
             }
