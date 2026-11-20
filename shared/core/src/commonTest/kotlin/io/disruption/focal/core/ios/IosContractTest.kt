@@ -6,6 +6,7 @@ import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.permissions.Permission
 import io.disruption.focal.core.session.BreakResult
 import io.disruption.focal.core.session.SessionTestFixture
 import io.disruption.focal.core.session.socialList
@@ -284,6 +285,32 @@ class IosContractTest {
         assertEquals(1, report.sessionsStarted)
         assertEquals(1, f.sessions.all.size)
         assertTrue(FocusSessionId("fs-ios") in f.engine.applied)
+    }
+
+    @Test
+    fun onLaunchWithScreenTimeRevokedLockedSessionsAreBrokenAndTheRestReapplied() = runTest {
+        val f = SessionTestFixture()
+        val locked = f.startFor(1.hours, strictness = Strictness.Locked)
+        val delayed = f.startFor(1.hours, strictness = Strictness.Delayed)
+        f.clock.advanceBy(10.minutes)
+
+        ingestOnLaunch(f.service, null, missing = listOf(Permission.ScreenTime))
+
+        assertEquals(Outcome.Broken, f.sessions.get(locked.id)!!.outcome)
+        assertTrue(locked.id !in f.engine.applied)
+        assertTrue(f.sessions.get(delayed.id)!!.isRunning)
+        assertTrue(delayed.id in f.engine.applied)
+    }
+
+    @Test
+    fun onLaunchWithNotificationsOffLockedSessionsKeepRunning() = runTest {
+        val f = SessionTestFixture()
+        val locked = f.startFor(1.hours, strictness = Strictness.Locked)
+
+        ingestOnLaunch(f.service, null, missing = listOf(Permission.Notifications))
+
+        assertTrue(f.sessions.get(locked.id)!!.isRunning)
+        assertTrue(locked.id in f.engine.applied)
     }
 
     @Test

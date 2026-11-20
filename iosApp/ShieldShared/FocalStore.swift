@@ -17,12 +17,21 @@ enum FocalStore {
     }
 
     /// Replace what [store] blocks. Apps and App Categories are serialised picker tokens (T15).
+    ///
+    /// [denyAppRemoval] is Uninstall Protection (T23, story 40): true for a Locked session's store.
+    /// The system combines all stores, so Focal can't be deleted while any Locked session's store
+    /// says so, and can again once the last one is cleared. Nil leaves it as the app last set it, for
+    /// an extension that doesn't know the session's Strictness.
     static func apply<Apps: Sequence, Categories: Sequence, Domains: Sequence>(
         apps: Apps,
         appCategories: Categories,
         domains: Domains,
+        denyAppRemoval: Bool? = nil,
         to store: ManagedSettingsStore
     ) where Apps.Element == String, Categories.Element == String, Domains.Element == String {
+        if let denyAppRemoval {
+            store.application.denyAppRemoval = denyAppRemoval ? true : nil
+        }
         let appTokens: Set<ApplicationToken> = decode(apps)
         let categoryTokens: Set<ActivityCategoryToken> = decode(appCategories)
         // Focal's websites are typed domains, not picker tokens, so they can't use `shield.webDomains`.
@@ -34,6 +43,14 @@ enum FocalStore {
         store.shield.applications = appTokens.isEmpty ? nil : appTokens
         store.shield.applicationCategories = categoryTokens.isEmpty ? nil : .specific(categoryTokens)
         store.webContent.blockedByFilter = webDomains.isEmpty ? nil : .specific(webDomains)
+    }
+
+    /// Stop [store] blocking apps and websites, for a Break. Uninstall Protection stays as it was: a
+    /// Delayed session raised to Locked mid-Break keeps it (Locked sessions never take Breaks).
+    static func clearBlocking(_ store: ManagedSettingsStore) {
+        store.shield.applications = nil
+        store.shield.applicationCategories = nil
+        store.webContent.blockedByFilter = nil
     }
 
     /// Tokens are stored as base64 of the token's JSON by the app picker (T15).

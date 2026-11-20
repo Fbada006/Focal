@@ -6,7 +6,8 @@ import Shared
 /// The iOS `BlockingEngine` (T16, ADR 0006): one named `ManagedSettingsStore` per Focus Session.
 /// The system enforces the most restrictive combination of all stores, so lifting one session never
 /// unblocks what another still blocks. It applies exactly what the session's own blocked set says
-/// and makes no domain decisions.
+/// and makes no domain decisions. A Locked session's store also turns on Uninstall Protection
+/// (`application.denyAppRemoval`, T23), so it lasts exactly as long as the session's block.
 ///
 /// Named stores persist across launches and are shared with the extensions, so a store is always
 /// looked up by name rather than remembered: a session applied before a relaunch, or started by the
@@ -39,6 +40,8 @@ final class IosBlockingEngine: NSObject, BlockingEngine {
                 apps: blocked.apps,
                 appCategories: blocked.appCategories,
                 domains: blocked.domains,
+                // Uninstall Protection while a Locked session runs (T23); lifting the store removes it.
+                denyAppRemoval: session.hasUninstallProtection,
                 to: store
             )
         }
@@ -97,7 +100,7 @@ final class IosBlockingEngine: NSObject, BlockingEngine {
             // The Break is recorded before the store is cleared, so the monitor (and anything reading
             // the record) never sees a cleared store without the Break that explains it.
             record?.breakEndsAt = end
-            FocalStore.named(name).clearAllSettings()
+            FocalStore.clearBlocking(FocalStore.named(name))
             paused = true
         }
         if paused {

@@ -46,10 +46,12 @@ fun startFocal(
     val scope = MainScope()
     // Keep the extensions' snapshot current, then ingest what they did while Focal wasn't running.
     IosSnapshotWriter(koin.get(), koin.get(), koin.get()).start(scope)
+    // Screen Time access revoked while Focal was away makes running Locked sessions Broken (T23).
     val catchUp = {
         scope.launch {
+            val missing = runCatching { permissionGateway.missing() }.getOrDefault(emptyList())
             val log = readExtensionEvents()
-            ingestOnLaunch(koin.get<FocusSessionService>(), log)
+            ingestOnLaunch(koin.get<FocusSessionService>(), log, missing)
             // Ingested events are now in the database; drop them so the log only holds what's pending.
             if (log != null) compactExtensionEvents(ingested = log)
         }
