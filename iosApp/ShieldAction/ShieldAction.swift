@@ -31,14 +31,19 @@ final class ShieldActionExtension: ShieldActionDelegate {
     }
 
     private func respond(to action: ShieldAction, completionHandler: @escaping (ShieldActionResponse) -> Void) {
-        if action == .secondaryButtonPressed {
-            postOpenFocalNotification()
-        }
         // Closing the Shield also leaves the blocked app, which is what both buttons do here.
-        completionHandler(.close)
+        guard action == .secondaryButtonPressed else {
+            completionHandler(.close)
+            return
+        }
+        // iOS may suspend the extension once the action completes, so wait until the notification
+        // is registered; otherwise Open Focal could leave nothing to tap.
+        postOpenFocalNotification {
+            completionHandler(.close)
+        }
     }
 
-    private func postOpenFocalNotification() {
+    private func postOpenFocalNotification(then done: @escaping () -> Void) {
         let content = UNMutableNotificationContent()
         content.title = "Open Focal"
         content.body = "Tap to manage your Focus Sessions."
@@ -49,6 +54,6 @@ final class ShieldActionExtension: ShieldActionDelegate {
             content: content,
             trigger: nil
         )
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().add(request) { _ in done() }
     }
 }
