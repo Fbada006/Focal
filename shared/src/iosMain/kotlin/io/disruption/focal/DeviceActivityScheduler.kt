@@ -1,6 +1,8 @@
 package io.disruption.focal
 
 import io.disruption.focal.core.ios.DeviceActivityPlan
+import io.disruption.focal.core.ios.RegisteredBreak
+import kotlin.time.Instant
 
 /**
  * Registers Focal's DeviceActivity intervals (T31). Implemented in Swift (`IosDeviceActivityScheduler`),
@@ -21,3 +23,14 @@ interface DeviceActivityScheduler {
 internal class NoDeviceActivityScheduler : DeviceActivityScheduler {
     override fun monitor(plan: DeviceActivityPlan) = true
 }
+
+/** A registered Break activity for [DeviceActivityPlan.finishedBreaks], from Swift's epoch milliseconds. */
+fun registeredBreak(name: String, endsAtEpochMillis: Long?): RegisteredBreak =
+    RegisteredBreak(name, endsAtEpochMillis?.let(Instant::fromEpochMilliseconds))
+
+/** [DeviceActivityPlan.finishedBreaks] at [nowEpochMillis], for Swift. */
+fun finishedBreakActivities(
+    registered: List<RegisteredBreak>,
+    recordedSessionIds: Set<String>,
+    nowEpochMillis: Long,
+): List<String> = DeviceActivityPlan.finishedBreaks(registered, recordedSessionIds, Instant.fromEpochMilliseconds(nowEpochMillis))

@@ -185,4 +185,28 @@ class DeviceActivityPlanTest {
         assertEquals(emptyList(), plan.fitting(1).schedules)
         assertEquals(emptySet(), plan.fitting(-3).names, "Breaks alone can fill the limit")
     }
+
+    @Test
+    fun finishedBreaksAreStoppedAndBreaksInProgressKept() {
+        val now = f.clock.now
+        val registered = listOf(
+            RegisteredBreak("focal-break-over", now - 1.minutes),
+            RegisteredBreak("focal-break-on", now + 4.minutes),
+            RegisteredBreak("focal-break-lifted", now + 4.minutes),
+            RegisteredBreak("focal-break-unknown-end", null),
+            RegisteredBreak("focal-schedule-2-sch", now - 1.hours),
+        )
+
+        val finished = DeviceActivityPlan.finishedBreaks(
+            registered,
+            recordedSessionIds = setOf("over", "on", "unknown-end"),
+            now = now,
+        )
+
+        assertEquals(
+            listOf("focal-break-over", "focal-break-lifted"),
+            finished,
+            "an ended interval or a lifted session is stopped; a Break in progress, an unknown end and other activities stay",
+        )
+    }
 }

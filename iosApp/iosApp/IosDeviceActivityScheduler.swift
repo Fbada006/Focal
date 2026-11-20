@@ -7,7 +7,8 @@ import Shared
 /// planned end. The DeviceActivityMonitor extension starts and ends sessions when they fire.
 ///
 /// It stops Schedule and session-end activities that are no longer planned (a Schedule switched off
-/// or deleted, a session that ended) and leaves Break intervals alone (T20). A session-end interval
+/// or deleted, a session that ended), and Break intervals (T20) that are over or whose session was
+/// lifted, so they don't use up the activity limit. A session-end interval
 /// the monitor registered for a session it started is kept while that session's record lasts
 /// (`FocalAppliedSessions`), even before the app has ingested the session: switching off or editing
 /// its Schedule then never leaves it without an end. An activity already registered with the same
@@ -27,6 +28,7 @@ final class IosDeviceActivityScheduler: NSObject, DeviceActivityScheduler {
         let schedulePrefix = DeviceActivityPlan.companion.SCHEDULE_PREFIX
         let endPrefix = DeviceActivityPlan.companion.SESSION_END_PREFIX
         let records = FocalAppliedSessions.all()
+        stopFinishedBreaks(in: center, records: records, now: now)
         let current = center.activities
         let ours = current.filter { $0.rawValue.hasPrefix(schedulePrefix) || $0.rawValue.hasPrefix(endPrefix) }
         // Session ends the monitor registered for its own sessions, which the plan doesn't know yet.
@@ -69,6 +71,29 @@ final class IosDeviceActivityScheduler: NSObject, DeviceActivityScheduler {
             NSLog("Focal: too many DeviceActivity intervals; not monitoring %@", dropped.joined(separator: ", "))
         }
         return registeredAll
+    }
+
+    /// Break intervals count against the activity limit while registered, and every Break registers
+    /// one. The engine stops them when a session is lifted or its Break is over (T20); this catches
+    /// any it missed (`DeviceActivityPlan.finishedBreaks` decides which).
+    private func stopFinishedBreaks(in center: DeviceActivityCenter, records: [String: FocalAppliedSession], now: Date) {
+        let breakPrefix = DeviceActivityPlan.companion.BREAK_PREFIX
+        let breaks = center.activities.filter { $0.rawValue.hasPrefix(breakPrefix) }.map { activity in
+            let end = center.schedule(for: activity).flatMap { Calendar.current.date(from: $0.intervalEnd) }
+            return DeviceActivitySchedulerKt.registeredBreak(
+                name: activity.rawValue,
+                endsAtEpochMillis: end.map { KotlinLong(value: Int64($0.timeIntervalSince1970 * 1000)) }
+            )
+        }
+        guard !breaks.isEmpty else { return }
+        let finished = DeviceActivitySchedulerKt.finishedBreakActivities(
+            registered: breaks,
+            recordedSessionIds: Set(records.keys),
+            nowEpochMillis: Int64(now.timeIntervalSince1970 * 1000)
+        )
+        if !finished.isEmpty {
+            center.stopMonitoring(finished.map { DeviceActivityName($0) })
+        }
     }
 
     /// Registering fails without Screen Time authorisation or past the activity cap; the launch

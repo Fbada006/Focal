@@ -1,5 +1,6 @@
 package io.disruption.focal
 
+import io.disruption.focal.core.ios.DeviceActivityPlan
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 
@@ -18,7 +19,7 @@ private fun storeName(id: String): String = "focal-session-$id"
  * The name of the DeviceActivity activity whose interval ends when [sessionId]'s Break ends (T20).
  * The DeviceActivityMonitor extension recognises it by the `focal-break-` prefix (`BreakResumer`).
  */
-fun breakActivityName(sessionId: FocusSessionId): String = "focal-break-${sessionId.value}"
+fun breakActivityName(sessionId: FocusSessionId): String = DeviceActivityPlan.breakActivityName(sessionId.value)
 
 /** [sessionId] as the plain id the extensions see in the snapshot (`FocalEndedSessions`, T20). */
 fun sessionIdString(sessionId: FocusSessionId): String = sessionId.value

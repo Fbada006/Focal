@@ -17,7 +17,8 @@ import kotlin.time.Instant
  *   the session's store. Focal records the outcome itself on next launch. A session whose planned end
  *   moves (edit) gets a new plan, so its interval is registered again for the new end.
  *
- * Breaks register their own intervals (`focal-break-`) and are not part of the plan. Everything
+ * Breaks register their own intervals ([BREAK_PREFIX]) and are not part of the plan, but they count
+ * against the limit while registered, so [finishedBreaks] picks the ones to stop first. Everything
  * here is worked out in Kotlin, so the Swift side only turns it into `DeviceActivitySchedule`s.
  *
  * iOS caps how many activities an app may monitor at once ([ACTIVITY_LIMIT], reported as 20, not
@@ -74,6 +75,27 @@ data class DeviceActivityPlan(
         fun scheduleActivityName(scheduleId: String, weekday: Int): String = "$SCHEDULE_PREFIX$weekday-$scheduleId"
 
         fun sessionEndActivityName(sessionId: String): String = "$SESSION_END_PREFIX$sessionId"
+
+        /** `focal-break-<session id>` (T20); the extension's `BreakResumer` reads it back. */
+        const val BREAK_PREFIX = "focal-break-"
+
+        fun breakActivityName(sessionId: String): String = "$BREAK_PREFIX$sessionId"
+
+        /**
+         * The Break activities among [registered] that nothing needs any more, to stop before
+         * counting what else is registered: their interval has ended (the Break is over), or their
+         * session has no applied-session record (it was lifted, so the end would do nothing).
+         * [recordedSessionIds] are the sessions with a record. A Break's own interval end is used,
+         * not the record's Break end, so a Break being registered right now is never stopped.
+         */
+        fun finishedBreaks(registered: List<RegisteredBreak>, recordedSessionIds: Set<String>, now: Instant): List<String> =
+            registered
+                .filter { it.name.startsWith(BREAK_PREFIX) }
+                .filter { activity ->
+                    val sessionId = activity.name.removePrefix(BREAK_PREFIX)
+                    sessionId !in recordedSessionIds || activity.endsAt?.let { it <= now } == true
+                }
+                .map { it.name }
 
         /**
          * The plan for the switched-on [schedules] and the [runningSessions] still due to end after
@@ -156,6 +178,9 @@ data class ScheduleActivity(
     val endMinute: Int,
     val warningMinutes: Int,
 )
+
+/** A Break activity registered with DeviceActivity, and when its interval ends ([endsAt] null if unknown). */
+data class RegisteredBreak(val name: String, val endsAt: Instant?)
 
 /**
  * A one-off interval ending at a running session's planned end; only its end matters. DeviceActivity
