@@ -19,11 +19,12 @@ enum SessionEnder {
         return id.isEmpty ? nil : id
     }
 
+    /// Never before the snapshot's planned end: the interval ends on the minute at or after it, and
+    /// a session extended since (`edit`) gets its interval registered again for the new end, so a
+    /// callback for the old end finds the session still running and leaves it blocking.
     static func end(sessionId: String, now: Date) {
-        // The snapshot says the session runs on (its end moved and this interval is stale, or it was
-        // stopped early): leave it blocking.
         if let session = FocalSnapshotReader.load()?.runningSessions.first(where: { $0.id == sessionId }),
-           session.plannedEnd > now.addingTimeInterval(BreakResumer.tolerance) { return }
+           session.plannedEnd > now { return }
         FocalStore.named(sessionId: sessionId).clearAllSettings()
     }
 }

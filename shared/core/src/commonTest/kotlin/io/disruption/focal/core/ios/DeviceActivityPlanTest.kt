@@ -14,8 +14,13 @@ import kotlinx.datetime.DayOfWeek.SUNDAY
 import kotlinx.datetime.LocalTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /** What Focal registers with DeviceActivity so Schedules and session ends run with Focal closed (T31). */
 class DeviceActivityPlanTest {
@@ -112,5 +117,41 @@ class DeviceActivityPlanTest {
         ).names
 
         assertEquals(setOf("focal-end-${session.id.value}", "focal-schedule-2-sch"), names)
+    }
+
+    @Test
+    fun anExtendedSessionsIntervalMovesToItsNewEnd() = runTest {
+        val session = f.startFor(1.hours, strictness = Strictness.Locked)
+        val before = DeviceActivityPlan.from(emptyList(), f.sessions.getRunning(), f.clock.now)
+
+        f.service.edit(session.id, shiftEndBy = 1.hours)
+        val after = DeviceActivityPlan.from(emptyList(), f.sessions.getRunning(), f.clock.now)
+
+        assertNotEquals(before, after, "a changed plan is registered again")
+        assertEquals(session.plannedEnd + 1.hours, after.sessionEnds.single().endsAt)
+    }
+
+    @Test
+    fun aSessionEndingMidMinuteIsLiftedOnTheMinuteAfterNeverBefore() = runTest {
+        f.clock.advanceBy(30.seconds)
+        val session = f.startFor(10.minutes)
+
+        val end = DeviceActivityPlan.from(emptyList(), f.sessions.getRunning(), f.clock.now).sessionEnds.single()
+
+        assertEquals(Instant.parse("2026-01-05T09:11:00Z"), end.endsAt)
+        assertTrue(end.endsAt >= session.plannedEnd)
+    }
+
+    @Test
+    fun droppingOrChangingAScheduleActivityReplacesSchedules() {
+        val monday = plan(schedule(setOf(MONDAY), LocalTime(9, 0), LocalTime(17, 0)))
+        val mondayAndSunday = plan(schedule(setOf(MONDAY, SUNDAY), LocalTime(9, 0), LocalTime(17, 0)))
+        val later = plan(schedule(setOf(MONDAY), LocalTime(9, 0), LocalTime(18, 0)))
+        val off = plan(schedule(setOf(MONDAY), LocalTime(9, 0), LocalTime(17, 0), enabled = false))
+
+        assertFalse(mondayAndSunday.replacesSchedulesOf(monday), "adding a day stops nothing")
+        assertTrue(later.replacesSchedulesOf(monday), "new times replace the activity")
+        assertTrue(off.replacesSchedulesOf(monday), "switching off stops it")
+        assertTrue(monday.replacesSchedulesOf(null), "nothing known about what is registered")
     }
 }

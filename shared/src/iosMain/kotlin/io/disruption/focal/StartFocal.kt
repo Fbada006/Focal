@@ -47,18 +47,31 @@ fun startFocal(
 ) {
     val koin = initKoin(blockingEngine, permissionGateway, platformModules = listOf(iosUiModule)).koin
     val scope = MainScope()
+    val sessions = koin.get<FocusSessionService>()
     // Keep the extensions' snapshot and DeviceActivity intervals current (T31), then ingest what
     // they did while Focal wasn't running.
-    IosSnapshotWriter(koin.get(), koin.get(), koin.get(), activityScheduler).start(scope)
+    val writer = IosSnapshotWriter(
+        koin.get(), koin.get(), koin.get(), activityScheduler,
+        ingestPending = {
+            val log = readExtensionEvents()
+            if (log != null) {
+                sessions.ingest(IosContract.decodeEvents(log))
+                compactExtensionEvents(ingested = log)
+            }
+        },
+    )
+    writer.start(scope)
     // Screen Time access revoked while Focal was away makes running Locked sessions Broken (T23).
     val catchUp = {
         scope.launch {
             val missing = runCatching { permissionGateway.missing() }.getOrDefault(emptyList())
             val log = readExtensionEvents()
             // Then start a Schedule window whose DeviceActivity start didn't fire (T31).
-            ingestOnLaunch(koin.get<FocusSessionService>(), log, missing, koin.get<ScheduleService>())
+            ingestOnLaunch(sessions, log, missing, koin.get<ScheduleService>())
             // Ingested events are now in the database; drop them so the log only holds what's pending.
             if (log != null) compactExtensionEvents(ingested = log)
+            // Intervals the system refused (no Screen Time access yet) are registered once it allows them.
+            writer.retry()
         }
     }
     catchUp()

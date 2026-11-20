@@ -19,6 +19,7 @@
 		288AC63D2960C328CA0DAF4F /* FocalSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C7FCB979DBCA3AE8EAE069 /* FocalSnapshot.swift */; };
 		77EB96832F2819893A35D3BB /* FocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A868F1D5FA797FA06652B70 /* FocalStore.swift */; };
 		DCD24CF5C5713225C7C04858 /* FocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A868F1D5FA797FA06652B70 /* FocalStore.swift */; };
+		C41F0C5E7B2D4E6F8A9B0C3F /* FocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A868F1D5FA797FA06652B70 /* FocalStore.swift */; };
 		9E1F67D94768D104DF4DD00F /* DeviceActivityMonitor.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = FAE5BD5B2E7AA2C68795BA41 /* DeviceActivityMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B31F0C5E7B2D4E6F8A9B0C1D /* ScheduleSessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31F0C5E7B2D4E6F8A9B0C1D /* ScheduleSessions.swift */; };
 		B31F0C5E7B2D4E6F8A9B0C2E /* SessionEnder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31F0C5E7B2D4E6F8A9B0C2E /* SessionEnder.swift */; };
@@ -398,6 +399,7 @@
 			files = (
 				89D0547003C2DAFEF486FC7F /* ShieldConfiguration.swift in Sources */,
 				75B85DCF353A63FB3D607F96 /* FocalSnapshot.swift in Sources */,
+				C41F0C5E7B2D4E6F8A9B0C3F /* FocalStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

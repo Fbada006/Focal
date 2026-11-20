@@ -8,10 +8,14 @@ import io.disruption.focal.core.ios.DeviceActivityPlan
  * given, stops Schedule and session-end activities no longer in the plan, and decides nothing.
  */
 interface DeviceActivityScheduler {
-    fun monitor(plan: DeviceActivityPlan)
+    /**
+     * Register [plan]. Returns false if the system refused any of it (no Screen Time access, too many
+     * activities), so Focal tries again later instead of taking the plan as registered.
+     */
+    fun monitor(plan: DeviceActivityPlan): Boolean
 }
 
 /** Until Swift supplies one (previews, tests): nothing is registered. */
 internal class NoDeviceActivityScheduler : DeviceActivityScheduler {
-    override fun monitor(plan: DeviceActivityPlan) = Unit
+    override fun monitor(plan: DeviceActivityPlan) = true
 }

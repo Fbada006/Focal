@@ -11,9 +11,14 @@ import Shared
 /// registered with the same interval is left as it is, so re-planning doesn't restart it.
 ///
 /// iOS caps how many activities an app may monitor (reported as 20); the plan lists what matters
-/// most first, and whatever the system refuses beyond that is skipped.
+/// most first, and whatever the system refuses beyond that is skipped. A refusal returns false, so
+/// the shared code registers the plan again later (on the next foreground) instead of caching it.
+///
+/// Before a plan that stops or replaces a Schedule activity gets here, the shared code ingests the
+/// sessions the monitor started, so a session running in that window has its own session-end
+/// interval in the plan.
 final class IosDeviceActivityScheduler: NSObject, DeviceActivityScheduler {
-    func monitor(plan: DeviceActivityPlan) {
+    func monitor(plan: DeviceActivityPlan) -> Bool {
         let center = DeviceActivityCenter()
         let planned = plan.names
         let stale = center.activities.filter { activity in
@@ -26,19 +31,30 @@ final class IosDeviceActivityScheduler: NSObject, DeviceActivityScheduler {
             center.stopMonitoring(stale)
         }
 
+        var registeredAll = true
         for end in plan.sessionEnds {
-            register(DeviceActivityName(end.name), Self.schedule(for: end), in: center)
+            registeredAll = register(DeviceActivityName(end.name), Self.schedule(for: end), in: center) && registeredAll
         }
         for activity in plan.schedules {
-            register(DeviceActivityName(activity.name), Self.schedule(for: activity), in: center)
+            registeredAll = register(DeviceActivityName(activity.name), Self.schedule(for: activity), in: center) && registeredAll
         }
+        return registeredAll
     }
 
     /// Registering fails without Screen Time authorisation or past the activity cap; the launch
-    /// and foreground catch-up still covers Schedules then.
-    private func register(_ name: DeviceActivityName, _ schedule: DeviceActivitySchedule, in center: DeviceActivityCenter) {
-        if let current = center.schedule(for: name), Self.same(current, schedule) { return }
-        try? center.startMonitoring(name, during: schedule)
+    /// and foreground catch-up still covers Schedules then. A changed interval (say, a session's
+    /// planned end moved) is stopped and registered again for its new end.
+    private func register(_ name: DeviceActivityName, _ schedule: DeviceActivitySchedule, in center: DeviceActivityCenter) -> Bool {
+        if let current = center.schedule(for: name) {
+            if Self.same(current, schedule) { return true }
+            center.stopMonitoring([name])
+        }
+        do {
+            try center.startMonitoring(name, during: schedule)
+            return true
+        } catch {
+            return false
+        }
     }
 
     private static func schedule(for end: SessionEndActivity) -> DeviceActivitySchedule {

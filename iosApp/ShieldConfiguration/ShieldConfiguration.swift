@@ -37,7 +37,8 @@ private enum FocalShieldConfiguration {
     static func make(app: ApplicationToken?, category: ActivityCategoryToken?, domain: String?) -> ShieldConfiguration {
         let now = Date()
         let content = FocalShieldContent.make(
-            snapshot: FocalSnapshotReader.load(),
+            // Schedule sessions the monitor started count too, before Focal has ingested them (T31).
+            snapshot: FocalSnapshotReader.load()?.withMonitorSessions(now: now),
             app: app,
             category: category,
             domain: domain,
@@ -79,5 +80,25 @@ private enum FocalShieldConfiguration {
         let rest = minutes % 60
         if hours == 0 { return "About \(minutes) min" }
         return rest == 0 ? "About \(hours) h" : "About \(hours) h \(rest) min"
+    }
+}
+
+private extension FocalSnapshot {
+    /// The running sessions plus those the monitor started for Schedules that the app hasn't ingested
+    /// yet (`FocalMonitorSessions`, T31), so a Schedule session shows its own name and time left while
+    /// Focal is closed. A session the app has ingested is counted once, and one it has since ended or
+    /// lifted as a duplicate (`FocalEndedSessions`) not at all.
+    func withMonitorSessions(now: Date) -> FocalSnapshot {
+        let known = Set(runningSessions.map(\.id))
+        let pending = FocalMonitorSessions.all().filter {
+            !known.contains($0.id) && $0.plannedEnd > now && !FocalEndedSessions.contains($0.id)
+        }
+        guard !pending.isEmpty else { return self }
+        return FocalSnapshot(
+            version: version,
+            blockLists: blockLists,
+            schedules: schedules,
+            runningSessions: runningSessions + pending
+        )
     }
 }

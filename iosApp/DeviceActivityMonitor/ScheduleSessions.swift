@@ -10,7 +10,8 @@ import Foundation
 /// `scheduleSessionEnded`. The app ingests both on launch and decides what they mean (ADR 0008).
 ///
 /// The session id is random and recorded in the App Group's defaults under the activity's name, so
-/// the end clears the store the start applied.
+/// the end clears the store the start applied. The session itself goes into `FocalMonitorSessions`
+/// for the Shield until the app has ingested it.
 enum ScheduleSessions {
     /// `DeviceActivityPlan.SCHEDULE_PREFIX` in Kotlin; keep the two identical.
     static let activityPrefix = "focal-schedule-"
@@ -47,6 +48,17 @@ enum ScheduleSessions {
             to: FocalStore.named(sessionId: sessionId)
         )
         record(activity, RecordedSession(sessionId: sessionId, plannedEnd: plannedEnd))
+        // The Shield shows this session's name and time left before the app has ingested it.
+        FocalMonitorSessions.record(FocalSnapshot.Session(
+            id: sessionId,
+            name: schedule.name,
+            scheduleId: schedule.id,
+            plannedEnd: plannedEnd,
+            breakEndsAt: nil,
+            apps: blockList.apps,
+            appCategories: blockList.appCategories,
+            domains: blockList.domains
+        ), now: now)
         FocalEventLog.append(type: "scheduleSessionStarted", at: now, fields: [
             "sessionId": sessionId,
             "scheduleId": schedule.id,
@@ -62,31 +74,48 @@ enum ScheduleSessions {
     }
 
     /// Called at the interval's end, and at its "will end" warning for a window shorter than
-    /// DeviceActivity's 15 minutes. Only the window's real end clears the store: stopping the
-    /// activity mid-window (the Schedule was switched off) must not weaken the running session.
+    /// DeviceActivity's 15 minutes. Only the session's real end clears the store: stopping the
+    /// activity mid-window (the Schedule was switched off or edited) must not weaken the running
+    /// session. Once the app has ingested the session, the snapshot's planned end counts, since the
+    /// session may have been extended; the app's session-end interval (`SessionEnder`) then ends it.
     static func end(activity: DeviceActivityName, now: Date) {
-        guard let recorded = recorded(activity),
-              recorded.plannedEnd <= now.addingTimeInterval(BreakResumer.tolerance) else { return }
+        guard let recorded = recorded(activity) else { return }
+        if let ingested = FocalSnapshotReader.load()?.runningSessions.first(where: { $0.id == recorded.sessionId }),
+           ingested.plannedEnd > now {
+            if recorded.plannedEnd <= now {
+                // The window is over but the session runs on: it is the app's to end now.
+                record(activity, nil)
+                FocalMonitorSessions.remove(recorded.sessionId)
+            }
+            return
+        }
+        guard recorded.plannedEnd <= now else { return }
         FocalStore.named(sessionId: recorded.sessionId).clearAllSettings()
         record(activity, nil)
+        FocalMonitorSessions.remove(recorded.sessionId)
         FocalEventLog.append(type: "scheduleSessionEnded", at: now, fields: ["sessionId": recorded.sessionId])
     }
 
-    /// When the window that started at about [now] ends: the next time the clock reads the
-    /// Schedule's end, which also covers overnight windows. Nil if that is further away than the
-    /// window is long, which means this start fired after its window was over.
+    /// When the window open at [now] ends, or nil if [now] isn't inside one (this start fired late,
+    /// or for a Schedule whose times have changed). The window is worked out on the local calendar,
+    /// as `ScheduleWindows` does: its start is the latest time the clock read the Schedule's start, and
+    /// its end the next time it reads the Schedule's end after that, which covers overnight windows
+    /// and windows that span a daylight-saving change.
     static func windowEnd(of schedule: FocalSnapshot.Schedule, now: Date) -> Date? {
         guard let start = minutes(schedule.start), let end = minutes(schedule.end) else { return nil }
-        var length = end - start
-        if length <= 0 { length += 24 * 60 }
         let calendar = Calendar.current
-        guard let plannedEnd = calendar.nextDate(
-            after: now,
+        // The start callback can arrive a moment before the minute it fires for.
+        guard let windowStart = calendar.nextDate(
+            after: now.addingTimeInterval(BreakResumer.tolerance),
+            matching: DateComponents(hour: start / 60, minute: start % 60, second: 0),
+            matchingPolicy: .nextTime,
+            direction: .backward
+        ), let windowEnd = calendar.nextDate(
+            after: windowStart,
             matching: DateComponents(hour: end / 60, minute: end % 60, second: 0),
             matchingPolicy: .nextTime
         ) else { return nil }
-        guard plannedEnd.timeIntervalSince(now) <= TimeInterval(length * 60) + BreakResumer.tolerance else { return nil }
-        return plannedEnd
+        return windowEnd > now ? windowEnd : nil
     }
 
     /// Minutes since midnight of an `HH:mm` time.

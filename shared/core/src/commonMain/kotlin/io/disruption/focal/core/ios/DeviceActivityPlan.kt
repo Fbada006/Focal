@@ -14,7 +14,8 @@ import kotlin.time.Instant
  * - [schedules]: one repeating interval per day a switched-on Schedule runs (or one daily interval
  *   when it runs every day). Its start starts a session from the snapshot, its end lifts it.
  * - [sessionEnds]: one interval per running Focus Session ending at its planned end, whose end lifts
- *   the session's store. Focal records the outcome itself on next launch.
+ *   the session's store. Focal records the outcome itself on next launch. A session whose planned end
+ *   moves (edit) gets a new plan, so its interval is registered again for the new end.
  *
  * Breaks register their own intervals (`focal-break-`) and are not part of the plan. Everything
  * here is worked out in Kotlin, so the Swift side only turns it into `DeviceActivitySchedule`s.
@@ -29,6 +30,17 @@ data class DeviceActivityPlan(
 ) {
     /** Every activity name in the plan; anything else Focal registered under these prefixes is stopped. */
     val names: Set<String> get() = (sessionEnds.map { it.name } + schedules.map { it.name }).toSet()
+
+    /**
+     * Whether registering this plan in place of [registered] would stop or replace a Schedule
+     * activity. The monitor may have started a session in that activity's window that Focal hasn't
+     * ingested yet, and whose only end callback is that activity's. Focal ingests pending extension
+     * events first, so such a session gets its own session-end interval before the Schedule's goes.
+     * [registered] is null when Focal doesn't know what is registered (first plan since launch, or the
+     * last registration failed).
+     */
+    fun replacesSchedulesOf(registered: DeviceActivityPlan?): Boolean =
+        registered == null || !schedules.containsAll(registered.schedules)
 
     companion object {
         /** `focal-schedule-<weekday>-<schedule id>`; the extension's `ScheduleSessions` reads it back. */
@@ -62,7 +74,7 @@ data class DeviceActivityPlan(
                             name = sessionEndActivityName(session.id.value),
                             sessionId = session.id.value,
                             startsAt = session.plannedEnd - SESSION_END_LEAD,
-                            endsAt = session.plannedEnd,
+                            endsAt = session.plannedEnd.roundedUpToMinute(),
                         )
                     },
             )
@@ -129,13 +141,23 @@ data class ScheduleActivity(
     val warningMinutes: Int,
 )
 
-/** A one-off interval ending at a running session's planned end; only its end matters. */
+/**
+ * A one-off interval ending at a running session's planned end; only its end matters. DeviceActivity
+ * fires on whole minutes, so [endsAt] is the planned end rounded up to the minute: the callback never
+ * comes before the session is due to end, and the extension never lifts a session early.
+ */
 data class SessionEndActivity(
     val name: String,
     val sessionId: String,
     val startsAt: Instant,
     val endsAt: Instant,
 )
+
+private fun Instant.roundedUpToMinute(): Instant {
+    val seconds = epochSeconds.mod(60L)
+    return if (seconds == 0L && nanosecondsOfSecond == 0) this
+    else Instant.fromEpochSeconds(epochSeconds - seconds + 60)
+}
 
 /** Apple's `Calendar` weekday: 1 = Sunday … 7 = Saturday. */
 private val DayOfWeek.appleWeekday: Int get() = isoDayNumber % 7 + 1
