@@ -16,15 +16,23 @@ final class IosBlockingEngine: NSObject, BlockingEngine {
         let blocked = session.blocked
         let sessionId = IosBlockingSupportKt.sessionIdString(sessionId: session.id)
         let store = FocalStore.named(IosBlockingSupportKt.managedSettingsStoreName(session: session))
+        var breakOver = false
         let applied = { (record: inout FocalAppliedSession?) in
-            // The record first, so the DeviceActivityMonitor re-applies this set at a Break's end. A
-            // Break in progress stays recorded: the session service pauses the session again next.
+            // A Break in progress stays recorded: the session service pauses the session again next.
+            // One that is over is forgotten here, in the same step, so its interval can be stopped
+            // below: if stopping ends the interval, the monitor then finds no Break and does nothing.
+            var breakEndsAt = record?.breakEndsAt
+            if let end = breakEndsAt, end <= Date() {
+                breakEndsAt = nil
+                breakOver = true
+            }
+            // The record first, so the DeviceActivityMonitor re-applies this set at a Break's end.
             record = FocalAppliedSession(
                 apps: Array(blocked.apps),
                 appCategories: Array(blocked.appCategories),
                 domains: Array(blocked.domains),
                 plannedEnd: Self.date(session.plannedEnd),
-                breakEndsAt: record?.breakEndsAt
+                breakEndsAt: breakEndsAt
             )
             // Re-applying replaces what this session blocks (additions while it runs).
             FocalStore.apply(
@@ -39,13 +47,15 @@ final class IosBlockingEngine: NSObject, BlockingEngine {
             var none: FocalAppliedSession?
             applied(&none)
         }
+        if breakOver { Self.stopMonitoringBreak(sessionId: session.id) }
         completionHandler(nil)
     }
 
-    /// A Break interval left registered here is harmless: when it ends the monitor finds no record
-    /// for the session and does nothing. Stopping it could itself end the interval early. Deleting
-    /// the record and clearing the store happen in one coordinated step (`FocalAppliedSessions`), so
-    /// the monitor can't re-apply the session in between.
+    /// Deleting the record and clearing the store happen in one coordinated step
+    /// (`FocalAppliedSessions`), so the monitor can't re-apply the session in between. The Break's
+    /// interval is stopped after that: stopping can end it early, and the monitor then finds no
+    /// record and does nothing. Left registered, every Break would keep one of the system's limited
+    /// DeviceActivity slots that Schedules need.
     func lift(sessionId: Any, completionHandler: @escaping (Error?) -> Void) {
         let name = IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)
         let id = IosBlockingSupportKt.sessionIdString(sessionId: sessionId)
@@ -57,6 +67,7 @@ final class IosBlockingEngine: NSObject, BlockingEngine {
         }
         // Cleared again outside the coordination, in case it couldn't run.
         FocalStore.named(name).clearAllSettings()
+        Self.stopMonitoringBreak(sessionId: sessionId)
         completionHandler(nil)
     }
 
@@ -89,8 +100,20 @@ final class IosBlockingEngine: NSObject, BlockingEngine {
             FocalStore.named(name).clearAllSettings()
             paused = true
         }
-        if paused { catchUp(at: end, key: name) }
+        if paused {
+            catchUp(at: end, key: name)
+        } else {
+            // Nothing recorded the Break, so its interval would never be stopped.
+            Self.stopMonitoringBreak(sessionId: sessionId)
+        }
         completionHandler(KotlinBoolean(bool: paused), nil)
+    }
+
+    /// Stop the session's Break interval, once nothing recorded depends on it. The engine's calls are
+    /// serialised by the session service, so this never stops a Break this engine registers later.
+    private static func stopMonitoringBreak(sessionId: Any) {
+        let activity = DeviceActivityName(IosBlockingSupportKt.breakActivityName(sessionId: sessionId))
+        DeviceActivityCenter().stopMonitoring([activity])
     }
 
     private static func date(_ instant: KotlinInstant) -> Date {
