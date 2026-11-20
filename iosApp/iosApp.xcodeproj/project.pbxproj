@@ -6,8 +6,54 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		204AD1A9A8B1881093D8B11F /* ShieldAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7159080968C312A6745E887E /* ShieldAction.swift */; };
+		4656D5B4C5D9EF041B820904 /* ShieldAction.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A1FE4EE798EA2F548A12881C /* ShieldAction.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		75B85DCF353A63FB3D607F96 /* FocalSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C7FCB979DBCA3AE8EAE069 /* FocalSnapshot.swift */; };
+		89D0547003C2DAFEF486FC7F /* ShieldConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97CDC802996AF8728CC8F28 /* ShieldConfiguration.swift */; };
+		AACC7D949DC3AEADFE0B6FBB /* FocalSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C7FCB979DBCA3AE8EAE069 /* FocalSnapshot.swift */; };
+		BADE969BECD3DBB1B4EBBF33 /* ShieldConfiguration.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = C2BBFAAF1E5783EC4C57B2B6 /* ShieldConfiguration.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		57F7F4326959262F4AC2443B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8F576C7F74FE997593350681 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B5DB92492BB29ECC83654DC3;
+			remoteInfo = ShieldAction;
+		};
+		A579183EE3A3AE7C6B310715 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8F576C7F74FE997593350681 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0C5234D0F46863F8A3BDAAFB;
+			remoteInfo = ShieldConfiguration;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7BBECAD965E639DBDAAD4A5F /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BADE969BECD3DBB1B4EBBF33 /* ShieldConfiguration.appex in Embed App Extensions */,
+				4656D5B4C5D9EF041B820904 /* ShieldAction.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		23549B0C977B66046FDDC8F0 /* Focal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Focal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7159080968C312A6745E887E /* ShieldAction.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShieldAction.swift; sourceTree = "<group>"; };
+		A1FE4EE798EA2F548A12881C /* ShieldAction.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShieldAction.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2C7FCB979DBCA3AE8EAE069 /* FocalSnapshot.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocalSnapshot.swift; sourceTree = "<group>"; };
+		C2BBFAAF1E5783EC4C57B2B6 /* ShieldConfiguration.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShieldConfiguration.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C97CDC802996AF8728CC8F28 /* ShieldConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShieldConfiguration.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -31,13 +77,29 @@
 		};
 		E3136E947CCDB5CCD3D4A22D /* Configuration */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Configuration;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		058DB3B4B0FF437301903D69 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EAAC0D88AF76C22FFB6E8E66 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F2E680A152329837B5E485E1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -53,13 +115,45 @@
 				E3136E947CCDB5CCD3D4A22D /* Configuration */,
 				0AD8156EB6C154C11E527C58 /* iosApp */,
 				E2FC92F508B250B6EC107C5B /* Products */,
+				7E4DEB727AF24CF60F6A63E7 /* ShieldShared */,
+				60D9523864B67E1CBE16F86E /* ShieldConfiguration */,
+				7825E33937C65C7F59A699E6 /* ShieldAction */,
 			);
+			sourceTree = "<group>";
+		};
+		60D9523864B67E1CBE16F86E /* ShieldConfiguration */ = {
+			isa = PBXGroup;
+			children = (
+				C97CDC802996AF8728CC8F28 /* ShieldConfiguration.swift */,
+			);
+			name = ShieldConfiguration;
+			path = ShieldConfiguration;
+			sourceTree = "<group>";
+		};
+		7825E33937C65C7F59A699E6 /* ShieldAction */ = {
+			isa = PBXGroup;
+			children = (
+				7159080968C312A6745E887E /* ShieldAction.swift */,
+			);
+			name = ShieldAction;
+			path = ShieldAction;
+			sourceTree = "<group>";
+		};
+		7E4DEB727AF24CF60F6A63E7 /* ShieldShared */ = {
+			isa = PBXGroup;
+			children = (
+				B2C7FCB979DBCA3AE8EAE069 /* FocalSnapshot.swift */,
+			);
+			name = ShieldShared;
+			path = ShieldShared;
 			sourceTree = "<group>";
 		};
 		E2FC92F508B250B6EC107C5B /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				23549B0C977B66046FDDC8F0 /* Focal.app */,
+				C2BBFAAF1E5783EC4C57B2B6 /* ShieldConfiguration.appex */,
+				A1FE4EE798EA2F548A12881C /* ShieldAction.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -67,6 +161,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0C5234D0F46863F8A3BDAAFB /* ShieldConfiguration */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7468E9E4142A0515024F0C42 /* Build configuration list for PBXNativeTarget "ShieldConfiguration" */;
+			buildPhases = (
+				9F5A1E60E0D79552BF943C5A /* Sources */,
+				058DB3B4B0FF437301903D69 /* Frameworks */,
+				1F6F1E4EFC8296B38FAA934A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShieldConfiguration;
+			productName = ShieldConfiguration;
+			productReference = C2BBFAAF1E5783EC4C57B2B6 /* ShieldConfiguration.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		3FCB62A7B4B7783FD6C607A8 /* iosApp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 3F63237BFD9560ECA25F5CF1 /* Build configuration list for PBXNativeTarget "iosApp" */;
@@ -75,20 +186,38 @@
 				2DE78E75D6D29563514754A9 /* Sources */,
 				EAAC0D88AF76C22FFB6E8E66 /* Frameworks */,
 				99C5B5FD41F28D865DFCBCF2 /* Resources */,
+				7BBECAD965E639DBDAAD4A5F /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AFCA88A98389BD544266095A /* PBXTargetDependency */,
+				044C72C745AE47C7015AEC33 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				0AD8156EB6C154C11E527C58 /* iosApp */,
 			);
 			name = iosApp;
-			packageProductDependencies = (
-			);
 			productName = iosApp;
 			productReference = 23549B0C977B66046FDDC8F0 /* Focal.app */;
 			productType = "com.apple.product-type.application";
+		};
+		B5DB92492BB29ECC83654DC3 /* ShieldAction */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F9D7A0760B66F4B6A5E6214A /* Build configuration list for PBXNativeTarget "ShieldAction" */;
+			buildPhases = (
+				1BCA691C4AB94F8A207AF143 /* Sources */,
+				F2E680A152329837B5E485E1 /* Frameworks */,
+				7ABF633FCECE730ACD577B1D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShieldAction;
+			productName = ShieldAction;
+			productReference = A1FE4EE798EA2F548A12881C /* ShieldAction.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -120,11 +249,27 @@
 			projectRoot = "";
 			targets = (
 				3FCB62A7B4B7783FD6C607A8 /* iosApp */,
+				0C5234D0F46863F8A3BDAAFB /* ShieldConfiguration */,
+				B5DB92492BB29ECC83654DC3 /* ShieldAction */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		1F6F1E4EFC8296B38FAA934A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7ABF633FCECE730ACD577B1D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		99C5B5FD41F28D865DFCBCF2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -157,6 +302,15 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1BCA691C4AB94F8A207AF143 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				204AD1A9A8B1881093D8B11F /* ShieldAction.swift in Sources */,
+				AACC7D949DC3AEADFE0B6FBB /* FocalSnapshot.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		2DE78E75D6D29563514754A9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -164,9 +318,205 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9F5A1E60E0D79552BF943C5A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				89D0547003C2DAFEF486FC7F /* ShieldConfiguration.swift in Sources */,
+				75B85DCF353A63FB3D607F96 /* FocalSnapshot.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		044C72C745AE47C7015AEC33 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ShieldAction;
+			target = B5DB92492BB29ECC83654DC3 /* ShieldAction */;
+			targetProxy = 57F7F4326959262F4AC2443B /* PBXContainerItemProxy */;
+		};
+		AFCA88A98389BD544266095A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ShieldConfiguration;
+			target = 0C5234D0F46863F8A3BDAAFB /* ShieldConfiguration */;
+			targetProxy = A579183EE3A3AE7C6B310715 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		037BBF49EA3EA4173FAF8A87 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ShieldConfiguration/ShieldConfiguration.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShieldConfiguration/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				PRODUCT_BUNDLE_IDENTIFIER = "io.disruption.focal.Focal$(TEAM_ID).ShieldConfiguration";
+				PRODUCT_NAME = ShieldConfiguration;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		103BF375C842D2D0A906CB37 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ShieldAction/ShieldAction.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShieldAction/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				PRODUCT_BUNDLE_IDENTIFIER = "io.disruption.focal.Focal$(TEAM_ID).ShieldAction";
+				PRODUCT_NAME = ShieldAction;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1121B113EE041A0AF7ECDBD5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
+				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = iosApp/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		7BB98C0945F7B4B74B964561 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ShieldAction/ShieldAction.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShieldAction/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				PRODUCT_BUNDLE_IDENTIFIER = "io.disruption.focal.Focal$(TEAM_ID).ShieldAction";
+				PRODUCT_NAME = ShieldAction;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B13D1A28F0883496A7C56BAA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ShieldConfiguration/ShieldConfiguration.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShieldConfiguration/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				PRODUCT_BUNDLE_IDENTIFIER = "io.disruption.focal.Focal$(TEAM_ID).ShieldConfiguration";
+				PRODUCT_NAME = ShieldConfiguration;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B9BC729715D52938E9406BCF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
+				DEVELOPMENT_TEAM = "${TEAM_ID}";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = iosApp/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		C1D2786AE19D5A4258E31D41 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = E3136E947CCDB5CCD3D4A22D /* Configuration */;
@@ -290,67 +640,27 @@
 			};
 			name = Release;
 		};
-		B9BC729715D52938E9406BCF /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = arm64;
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = "${TEAM_ID}";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = iosApp/Info.plist;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		1121B113EE041A0AF7ECDBD5 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = arm64;
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = "${TEAM_ID}";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = iosApp/Info.plist;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3F63237BFD9560ECA25F5CF1 /* Build configuration list for PBXNativeTarget "iosApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B9BC729715D52938E9406BCF /* Debug */,
+				1121B113EE041A0AF7ECDBD5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7468E9E4142A0515024F0C42 /* Build configuration list for PBXNativeTarget "ShieldConfiguration" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				037BBF49EA3EA4173FAF8A87 /* Release */,
+				B13D1A28F0883496A7C56BAA /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		867769F44AF01EB11F1119BE /* Build configuration list for PBXProject "iosApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -360,11 +670,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3F63237BFD9560ECA25F5CF1 /* Build configuration list for PBXNativeTarget "iosApp" */ = {
+		F9D7A0760B66F4B6A5E6214A /* Build configuration list for PBXNativeTarget "ShieldAction" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				B9BC729715D52938E9406BCF /* Debug */,
-				1121B113EE041A0AF7ECDBD5 /* Release */,
+				7BB98C0945F7B4B74B964561 /* Release */,
+				103BF375C842D2D0A906CB37 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

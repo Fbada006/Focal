@@ -14,8 +14,9 @@ import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.stringWithContentsOfFile
 
 /**
- * The App Group the app shares with its Screen Time extensions (ADR 0008). The entitlement is
- * added with the extensions (T16); until then there is no container and nothing is read.
+ * The App Group the app shares with its Screen Time extensions (ADR 0008). The app and every
+ * extension carry this exact id in their entitlements; the Swift side repeats it in
+ * `FocalSnapshotReader.appGroup`.
  */
 const val APP_GROUP_ID = "group.io.disruption.focal"
 
@@ -33,6 +34,8 @@ fun startFocal(
 ) {
     val koin = initKoin(blockingEngine, permissionGateway, platformModules = listOf(iosUiModule)).koin
     val scope = MainScope()
+    // Keep the extensions' snapshot current, then ingest what they did while Focal wasn't running.
+    IosSnapshotWriter(koin.get(), koin.get(), koin.get()).start(scope)
     scope.launch { ingestOnLaunch(koin.get<FocusSessionService>(), readExtensionEvents()) }
 }
 
