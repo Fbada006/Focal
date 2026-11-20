@@ -3,7 +3,9 @@ package io.disruption.focal.blocking
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import io.disruption.focal.core.apps.AppCategoryResolver
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.blocking.BlockingState
@@ -42,7 +44,14 @@ class AndroidBlockingEngine(
     private val foreground = MutableStateFlow<String?>(null)
     private val _shield = MutableStateFlow<ShieldContent?>(null)
 
-    /** Package name → App Category key (or null), cached so foreground events stay cheap. */
+    /**
+     * Shield refreshes come from the accessibility service on Main and from session and Break-end
+     * coroutines on Default. Each refresh reads the latest state, computes and publishes under this
+     * lock, so an older calculation can never overwrite a newer one.
+     */
+    private val shieldLock = Any()
+
+    /** Package name → App Category key (or null), cached so foreground events stay cheap. Guarded by [shieldLock]. */
     private val categoryCache = mutableMapOf<String, String?>()
 
     /** Running sessions, soonest end first. */
@@ -84,17 +93,15 @@ class AndroidBlockingEngine(
         applied.value[sessionId]?.let(::scheduleRefreshAtBreakEnd)
     }
 
-    private fun refreshShield() {
+    private fun refreshShield() = synchronized(shieldLock) {
         val packageName = foreground.value
-        if (packageName == null) {
-            _shield.value = null
-            return
+        _shield.value = packageName?.let {
+            BlockingState(applied.value.values.toList()).forApp(
+                packageName = it,
+                category = categoryOf(it),
+                now = clock.now(),
+            )
         }
-        _shield.value = BlockingState(applied.value.values.toList()).forApp(
-            packageName = packageName,
-            category = categoryOf(packageName),
-            now = clock.now(),
-        )
     }
 
     private fun categoryOf(packageName: String): String? = categoryCache.getOrPut(packageName) {
@@ -130,27 +137,49 @@ class AndroidBlockingEngine(
     }
 }
 
-/** The package names that fire window events but are never worth blocking. */
+/**
+ * The package names that are never Shielded, even if a Block List picks them: window-event noise
+ * (System UI, the launcher, keyboards), Focal itself, and the screens ADR 0002 keeps reachable
+ * (Settings, the permission controller and the package installer, including OEM variants).
+ */
 internal class NoisePackages(context: Context) {
     private val packages: Set<String> = buildSet {
         add(context.packageName)
         add("com.android.systemui")
-        homePackage(context)?.let(::add)
+        addAll(SYSTEM_ESCAPE_PACKAGES)
+        resolvedPackage(context, Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))?.let(::add)
+        resolvedPackage(context, Intent(Settings.ACTION_SETTINGS))?.let(::add)
+        resolvedPackage(context, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
+            ?.let(::add)
+        resolvedPackage(context, Intent(Intent.ACTION_DELETE, Uri.parse("package:${context.packageName}")))?.let(::add)
         val inputMethods = context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
         inputMethods?.enabledInputMethodList?.forEach { add(it.packageName) }
         inputMethods?.inputMethodList?.forEach { add(it.packageName) }
     }
 
     operator fun contains(packageName: String): Boolean = packageName in packages
+
+    private companion object {
+        /** AOSP and Google builds; OEM Settings and installers are added by resolving their intents. */
+        val SYSTEM_ESCAPE_PACKAGES = setOf(
+            "com.android.settings",
+            "com.android.permissioncontroller",
+            "com.google.android.permissioncontroller",
+            "com.android.packageinstaller",
+            "com.google.android.packageinstaller",
+        )
+    }
 }
 
-private fun homePackage(context: Context): String? {
-    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-    val resolved = if (Build.VERSION.SDK_INT >= 33) {
-        context.packageManager.resolveActivity(intent, PackageManager.ResolveInfoFlags.of(0))
-    } else {
-        @Suppress("DEPRECATION")
-        context.packageManager.resolveActivity(intent, 0)
-    }
-    return resolved?.activityInfo?.packageName
+private fun resolvedPackage(context: Context, intent: Intent): String? {
+    val resolved = runCatching {
+        if (Build.VERSION.SDK_INT >= 33) {
+            context.packageManager.resolveActivity(intent, PackageManager.ResolveInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.resolveActivity(intent, 0)
+        }
+    }.getOrNull()
+    // An ambiguous intent resolves to the system chooser ("android"), which says nothing useful.
+    return resolved?.activityInfo?.packageName?.takeUnless { it == "android" }
 }

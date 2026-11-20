@@ -15,11 +15,13 @@ import io.disruption.focal.core.session.FocusSessionService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.core.context.GlobalContext
@@ -67,7 +69,11 @@ class RunningSessionService : Service() {
                 // Wake up when the next session ends, and re-plan if the set changes meanwhile.
                 val wait = (sessions.first().plannedEnd - Clock.System.now()).coerceAtLeast(1.seconds)
                 delay(wait)
-                runCatching { sessionService().completeDueSessions() }
+                // Completing lifts sessions, which changes `running` and would cancel this block
+                // mid-batch. The wait stays cancellable; the batch must finish.
+                withContext(NonCancellable) {
+                    runCatching { sessionService().completeDueSessions() }
+                }
             }
         }
         return START_STICKY

@@ -1,6 +1,7 @@
 package io.disruption.focal.blocking
 
 import android.accessibilityservice.AccessibilityService
+import android.content.ComponentName
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import io.disruption.focal.MainActivity
@@ -58,12 +59,20 @@ class FocalAccessibilityService : AccessibilityService() {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val packageName = event.packageName?.toString() ?: return
         val engine = engine ?: return
+        // The Shield window is Focal's own and fires window events when shown. Only a Focal
+        // Activity means the user really came to Focal; anything else keeps the current block.
+        if (packageName == this.packageName && !isFocalActivity(event.className)) return
         // Leaving the app (launcher, System UI, keyboard) or returning to Focal lifts the Shield.
         if (packageName in noise) {
             engine.onForeground(null)
             return
         }
         engine.onForeground(packageName)
+    }
+
+    private fun isFocalActivity(className: CharSequence?): Boolean {
+        val name = className?.toString() ?: return false
+        return runCatching { packageManager.getActivityInfo(ComponentName(this, name), 0) }.isSuccess
     }
 
     override fun onInterrupt() {

@@ -8,7 +8,8 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
 
 - **Apps**: an `AccessibilityService` listening for `TYPE_WINDOW_STATE_CHANGED`. The event carries the package name, arrives instantly, and costs nothing when nothing changes.
 - Keep the service config narrow: only the event types we need.
-- Ignore noise packages that also fire window events: Focal itself, the launcher, System UI, the keyboard (IME).
+- Ignore noise packages that also fire window events: Focal itself, the launcher, System UI, the keyboard (IME). Only a Focal Activity counts as "came to Focal"; events from Focal's own Shield window are ignored so the Shield doesn't hide itself.
+- Never Shield Settings, the permission controller or the package installer (AOSP, Google and the device's resolved Settings/uninstall handlers), even if a Block List picks them (ADR 0002).
 - **Websites**: same service, with `canRetrieveWindowContent` enabled, reading the address bar of supported browsers via a per-browser lookup table (package name → address-bar view ID).
   - `canRetrieveWindowContent` only grants access to the view tree; it doesn't decide *when* we look. Following a link, switching tabs or typing a new URL happens inside the same browser window and need not fire `TYPE_WINDOW_STATE_CHANGED`.
   - So for supported browser packages, also listen for `TYPE_WINDOW_CONTENT_CHANGED` and `TYPE_VIEW_TEXT_CHANGED`, and re-check the address bar on each. Scope these to the browser packages (via `packageNames` or an early filter) and debounce them, since content-change events are frequent.
