@@ -36,7 +36,20 @@ fun startFocal(
     val scope = MainScope()
     // Keep the extensions' snapshot current, then ingest what they did while Focal wasn't running.
     IosSnapshotWriter(koin.get(), koin.get(), koin.get()).start(scope)
-    scope.launch { ingestOnLaunch(koin.get<FocusSessionService>(), readExtensionEvents()) }
+    val catchUp = { scope.launch { ingestOnLaunch(koin.get<FocusSessionService>(), readExtensionEvents()) } }
+    catchUp()
+    onBecameActive = { catchUp() }
+}
+
+private var onBecameActive: (() -> Unit)? = null
+
+/**
+ * Call from Swift each time Focal comes to the foreground: ingests what the extensions did meanwhile
+ * and re-applies running sessions, so a Break that ended while Focal was suspended is blocking again
+ * even if the DeviceActivity monitor didn't fire (T20, docs/ios-blocking-engine.md).
+ */
+fun focalDidBecomeActive() {
+    onBecameActive?.invoke()
 }
 
 @OptIn(ExperimentalForeignApi::class)

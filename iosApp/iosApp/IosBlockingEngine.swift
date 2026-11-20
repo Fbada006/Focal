@@ -1,3 +1,4 @@
+import DeviceActivity
 import Foundation
 import ManagedSettings
 import Shared
@@ -12,45 +13,50 @@ import Shared
 /// DeviceActivityMonitor extension, can still be lifted.
 final class IosBlockingEngine: NSObject, BlockingEngine {
     func apply(session: FocusSession, completionHandler: @escaping (Error?) -> Void) {
-        let store = Self.store(named: IosBlockingSupportKt.managedSettingsStoreName(session: session))
         let blocked = session.blocked
-        let apps: Set<ApplicationToken> = Self.decode(blocked.apps)
-        let categories: Set<ActivityCategoryToken> = Self.decode(blocked.appCategories)
-        // Focal's websites are typed domains, not picker tokens, so they can't use `shield.webDomains`.
-        // Safari's content filter blocks them with the system's own page instead of Focal's Shield.
-        let domains = Set(blocked.domains.map { WebDomain(domain: $0) })
-
-        // Re-applying replaces what this session blocks (additions while it runs). Set each field
-        // straight to its new value, never clear first: clearing would briefly unblock what the
-        // session still blocks, which a Delayed or Locked session must never do.
-        store.shield.applications = apps.isEmpty ? nil : apps
-        store.shield.applicationCategories = categories.isEmpty ? nil : .specific(categories)
-        store.webContent.blockedByFilter = domains.isEmpty ? nil : .specific(domains)
+        // Re-applying replaces what this session blocks (additions while it runs).
+        FocalStore.apply(
+            apps: blocked.apps,
+            appCategories: blocked.appCategories,
+            domains: blocked.domains,
+            to: FocalStore.named(IosBlockingSupportKt.managedSettingsStoreName(session: session))
+        )
         completionHandler(nil)
     }
 
+    /// A Break interval left registered here is harmless: the monitor finds the session gone from
+    /// the snapshot and does nothing. Stopping it could itself end the interval early.
     func lift(sessionId: Any, completionHandler: @escaping (Error?) -> Void) {
-        Self.store(named: IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)).clearAllSettings()
+        FocalStore.named(IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)).clearAllSettings()
         completionHandler(nil)
     }
 
-    /// A Break lifts this session's blocking. Re-applying it when the Break ends, even while Focal
-    /// isn't running, belongs to the DeviceActivityMonitor extension (T20), which reads the session's
-    /// `breakEndsAt` from the snapshot.
+    /// A Break lifts this session's blocking until [until] (T20). The DeviceActivityMonitor extension
+    /// re-applies it then, even while Focal isn't running; Focal also re-applies it whenever it comes
+    /// to the foreground, in case the interval didn't fire.
     func pauseUntil(sessionId: Any, until: KotlinInstant, completionHandler: @escaping (Error?) -> Void) {
-        Self.store(named: IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)).clearAllSettings()
+        FocalStore.named(IosBlockingSupportKt.managedSettingsStoreName(sessionId: sessionId)).clearAllSettings()
+        let end = Date(timeIntervalSince1970: TimeInterval(until.toEpochMilliseconds()) / 1000)
+        let activity = DeviceActivityName(IosBlockingSupportKt.breakActivityName(sessionId: sessionId))
+        // Registering fails without Screen Time authorisation; the foreground re-apply still covers it.
+        try? Self.monitorBreak(activity, endingAt: end)
         completionHandler(nil)
     }
 
-    private static func store(named name: String) -> ManagedSettingsStore {
-        ManagedSettingsStore(named: ManagedSettingsStore.Name(name))
+    /// DeviceActivity intervals must last at least 15 minutes, and a Break lasts 5, so the interval
+    /// starts in the past and only its end is used (docs/ios-blocking-engine.md). Registering the
+    /// same name again replaces the previous interval.
+    private static func monitorBreak(_ activity: DeviceActivityName, endingAt end: Date) throws {
+        let calendar = Calendar.current
+        let components: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
+        let schedule = DeviceActivitySchedule(
+            intervalStart: calendar.dateComponents(components, from: end.addingTimeInterval(-minimumInterval)),
+            intervalEnd: calendar.dateComponents(components, from: end),
+            repeats: false
+        )
+        try DeviceActivityCenter().startMonitoring(activity, during: schedule)
     }
 
-    /// Tokens are stored as base64 of the token's JSON by the app picker (T15).
-    private static func decode<T: Decodable & Hashable>(_ encoded: Set<String>) -> Set<T> {
-        Set(encoded.compactMap { value in
-            guard let data = Data(base64Encoded: value) else { return nil }
-            return try? JSONDecoder().decode(T.self, from: data)
-        })
-    }
+    /// DeviceActivity's shortest allowed interval, plus a minute of margin.
+    private static let minimumInterval: TimeInterval = 16 * 60
 }

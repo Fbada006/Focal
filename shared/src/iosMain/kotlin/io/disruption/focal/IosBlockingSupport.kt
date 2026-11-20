@@ -13,3 +13,9 @@ fun managedSettingsStoreName(session: FocusSession): String = storeName(session.
 fun managedSettingsStoreName(sessionId: FocusSessionId): String = storeName(sessionId.value)
 
 private fun storeName(id: String): String = "focal-session-$id"
+
+/**
+ * The name of the DeviceActivity activity whose interval ends when [sessionId]'s Break ends (T20).
+ * The DeviceActivityMonitor extension recognises it by the `focal-break-` prefix (`BreakResumer`).
+ */
+fun breakActivityName(sessionId: FocusSessionId): String = "focal-break-${sessionId.value}"

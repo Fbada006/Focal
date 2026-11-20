@@ -1,19 +1,23 @@
 package io.disruption.focal.core.ios
 
 import io.disruption.focal.core.model.Break
+import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
 import io.disruption.focal.core.model.Outcome
 import io.disruption.focal.core.model.ScheduleId
 import io.disruption.focal.core.model.Strictness
+import io.disruption.focal.core.session.BreakResult
 import io.disruption.focal.core.session.SessionTestFixture
 import io.disruption.focal.core.session.socialList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 private val socialApps = socialList.blocked.apps.toList()
@@ -197,6 +201,27 @@ class IosContractTest {
 
         assertEquals(0, report.breaksEnded)
         assertEquals(onBreak.breaks, f.sessions.get(FocusSessionId("fs-ios"))!!.breaks)
+    }
+
+    @Test
+    fun comingBackAfterTheMonitorEndedABreakKeepsTheSessionBlocking() = runTest {
+        // T20: the Break's DeviceActivity interval ended (a little early, to the minute) while Focal
+        // was suspended; Focal comes back to the foreground before the recorded Break end.
+        val f = SessionTestFixture()
+        val session = f.startFor(1.hours, strictness = Strictness.Delayed)
+        val breakEnd = assertIs<BreakResult.Started>(f.service.takeBreak(session.id)).endsAt
+        f.clock.advanceBy(FocusSession.BREAK_LENGTH - 30.seconds)
+        val log = IosContract.encodeEvents(
+            ExtensionEventLog(events = listOf(ExtensionEvent.BreakEnded("ev-b", breakEnd - 1.minutes, session.id.value))),
+        )
+
+        val report = ingestOnLaunch(f.service, log)
+
+        assertEquals(1, report.breaksEnded)
+        assertEquals(breakEnd - 1.minutes, f.sessions.get(session.id)!!.breaks.single().endsAt)
+        // Re-applied, and not paused again for what is left of the recorded Break.
+        assertTrue(session.id in f.engine.applied)
+        assertTrue(session.id !in f.engine.pausedUntil)
     }
 
     @Test

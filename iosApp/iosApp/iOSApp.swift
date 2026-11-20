@@ -6,6 +6,7 @@ import Shared
 struct iOSApp: App {
     private let blockingEngine = IosBlockingEngine()
     private let notifications = NotificationRouter()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         IosScreenTimeBridge.shared.picker = ScreenTimeAppPicker.shared
@@ -19,6 +20,10 @@ struct iOSApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Catch up with what happened while Focal was away, such as a Break that ended (T20).
+            if phase == .active { StartFocalKt.focalDidBecomeActive() }
         }
     }
 }
