@@ -33,6 +33,7 @@ Decisions these notes build on: [ADR 0002](adr/0002-locked-is-best-effort-on-and
 - For blocks that shouldn't be dismissible, also call `performGlobalAction(GLOBAL_ACTION_HOME)` so the blocked app isn't left running underneath.
 - A Compose overlay outside an Activity needs a `LifecycleOwner` and `SavedStateRegistryOwner` attached to the `ComposeView` by hand.
 - Measure **time-to-Shield** per device to know whether it works.
+- What is blocked changes on its own when a Break ends and at a session's planned end, with no new foreground event. The engine refreshes the Shield at both moments itself (waiting on the wall clock, so a clock set back doesn't wake it early), so it reappears after a Break and lifts at the planned end even if the foreground service could not start.
 
 ## 3. Stay alive
 

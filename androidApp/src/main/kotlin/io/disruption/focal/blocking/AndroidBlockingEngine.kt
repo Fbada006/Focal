@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import java.util.concurrent.ConcurrentHashMap
 import io.disruption.focal.core.apps.AppCategoryResolver
 import io.disruption.focal.core.blocking.BlockingEngine
 import io.disruption.focal.core.blocking.BlockingState
@@ -13,10 +14,11 @@ import io.disruption.focal.core.blocking.ShieldContent
 import io.disruption.focal.core.model.Break
 import io.disruption.focal.core.model.FocusSession
 import io.disruption.focal.core.model.FocusSessionId
+import io.disruption.focal.core.time.waitUntil
 import io.disruption.focal.data.apps.AndroidAppCategories
 import io.disruption.focal.data.curated.CuratedAppCategories
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +28,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -54,6 +55,9 @@ class AndroidBlockingEngine(
     /** Package name → App Category key (or null), cached so foreground events stay cheap. Guarded by [shieldLock]. */
     private val categoryCache = mutableMapOf<String, String?>()
 
+    /** The pending Shield refreshes for each applied session; replaced on every apply. */
+    private val refreshJobs = ConcurrentHashMap<FocusSessionId, Job>()
+
     /** Running sessions, soonest end first. */
     val running: StateFlow<List<FocusSession>> = applied
         .map { sessions -> sessions.values.sortedBy { it.plannedEnd } }
@@ -75,11 +79,12 @@ class AndroidBlockingEngine(
         applied.update { it + (session.id to session) }
         refreshShield()
         startRunningService()
-        scheduleRefreshAtBreakEnd(session)
+        scheduleRefreshes(session)
     }
 
     override suspend fun lift(sessionId: FocusSessionId) {
         applied.update { it - sessionId }
+        refreshJobs.remove(sessionId)?.cancel()
         refreshShield()
         if (applied.value.isEmpty()) stopRunningService()
     }
@@ -93,7 +98,7 @@ class AndroidBlockingEngine(
             else sessions + (sessionId to session.copy(breaks = session.breaks + Break(startedAt = now, endsAt = until)))
         }
         refreshShield()
-        applied.value[sessionId]?.let(::scheduleRefreshAtBreakEnd)
+        applied.value[sessionId]?.let(::scheduleRefreshes)
     }
 
     private fun refreshShield() = synchronized(shieldLock) {
@@ -115,15 +120,20 @@ class AndroidBlockingEngine(
     }
 
     /**
-     * A Break lifts blocking, but the user may stay in the blocked app. Nothing asks the engine
-     * again when the Break ends, so refresh then and let the Shield reappear on its own (T19).
+     * What is blocked changes on its own when a Break ends and at the planned end, but the user may
+     * stay in the app meanwhile and nothing else asks the engine again. Refresh at both moments, so
+     * the Shield reappears after a Break (T19) and lifts at the planned end even when the
+     * running-session service could not start to complete the session.
      */
-    private fun scheduleRefreshAtBreakEnd(session: FocusSession) {
-        val end = session.currentBreak(clock.now())?.endsAt ?: return
-        scope.launch {
-            delay((end - clock.now()).coerceAtLeast(0.seconds))
-            refreshShield()
+    private fun scheduleRefreshes(session: FocusSession) {
+        val moments = listOfNotNull(session.currentBreak(clock.now())?.endsAt, session.plannedEnd).sorted()
+        val job = scope.launch {
+            for (at in moments) {
+                clock.waitUntil(at)
+                refreshShield()
+            }
         }
+        refreshJobs.put(session.id, job)?.cancel()
     }
 
     private fun startRunningService() {
