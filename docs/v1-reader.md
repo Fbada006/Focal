@@ -25,12 +25,12 @@ Focal blocks distracting apps and websites during **Focus Sessions**, started by
   - **Normal**: end any time (Ended Early).
   - **Delayed**: 30 s Exit Countdown to end early, up to three 5-minute Breaks that resume automatically.
   - **Locked**: cannot be ended. Android: best-effort, revoking the accessibility service makes it Broken. iOS: Uninstall Protection.
-  - **Stricter-only edits** of a running session: add targets, extend, raise Strictness; removals, shortening and lowering are refused or deferred (ADR 0007).
+  - **Stricter-only edits** of a running session: add targets, extend, raise Strictness; for Delayed and Locked sessions, removals, shortening and lowering are refused or deferred. Normal sessions are exempt and can be edited freely (ADR 0007).
 - **Schedules**: days, start/end (overnight allowed), Block List, Strictness, on/off switch. Start on time with Focal closed (Android exact alarms, iOS DeviceActivity monitor); missed starts catch up and still end at the scheduled end.
 - **Shield**: shown instead of a blocked app or supported-browser website, names the session ("+N more"), time left, a motivational line, and only Close and Open Focal. On a blocked website, Close opens a new tab in the same browser.
 - **Stats and Streaks**: focus time today and this week, outcome counts, current and longest Streak (a day counts with a Completed session of at least 15 minutes), Android Glance home-screen widget.
 - **Android extras**: OEM battery guidance (Xiaomi, Samsung, Huawei, OnePlus) and a "Why did my session stop?" help entry.
-- **Privacy**: all data on the device, no account, no backend, no analytics, no `INTERNET` permission on Android (ADR 0003).
+- **Privacy**: Focal itself transmits nothing: data is stored on the device, with no account, backend or analytics, and no `INTERNET` permission on Android (ADR 0003). OS-managed backups (Android `allowBackup`, iCloud or computer backups) can still copy it, as the [privacy policy](privacy-policy.md) says.
 
 ## 3. Technical system
 
@@ -47,7 +47,7 @@ Kotlin Multiplatform with Compose Multiplatform UI. Each platform has its own bl
 | Android blocking | AccessibilityService, accessibility overlay, `specialUse` foreground service, exact alarms |
 | iOS blocking | FamilyControls, ManagedSettings, DeviceActivity, Shield extensions |
 | Widget | Jetpack Glance |
-| Targets | Android API 26 to 37, iOS 17+ |
+| Targets | Android API 26 to 37; iOS: intended minimum 17 (spec), but the Xcode project currently sets the deployment target to 18.2 for the app and all three extensions, so it won't install on iOS 17 or 18.0–18.1 until that is lowered |
 
 ### Module layering (ADR 0010)
 
@@ -136,8 +136,8 @@ flowchart LR
 ## 5. What is coming
 
 Still open for v1 (GitHub issues):
-- #2 Request the Family Controls (Distribution) entitlement for the app and every extension bundle ID. Do this first; it gates TestFlight.
-- #3 to #8 Device prototypes: iOS Break resumption under the 15-minute interval minimum, named-store cap, Open Focal from the Shield, Android time-to-Shield and flicker.
+- #4 (T2) Request the Family Controls (Distribution) entitlement for the app and every extension bundle ID. Do this first; it gates TestFlight. (#2 is the parent "Focal v1" backlog.)
+- #5 to #8 (T3 to T6) Device prototypes: iOS Break resumption under the 15-minute interval minimum, named-store cap, Open Focal from the Shield, Android time-to-Shield and flicker.
 - #38 Store submission: fill placeholders, record the Play review video, submit to Play Console and App Store Connect.
 
 Planned after v1 (spec "Out of Scope"): app limits and daily budgets, allow-list mode, per-app screen-time reports (v1.1); accounts, sync and backups; social features; paid tier; VPN-based strict web blocking; configurable Exit Countdown, Break length and count; richer Schedules (multiple windows, dates, holidays, skip today); a saved-websites library.
