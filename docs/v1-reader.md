@@ -27,8 +27,8 @@ Focal blocks distracting apps and websites during **Focus Sessions**, started by
   - **Locked**: cannot be ended. Android: best-effort, revoking the accessibility service makes it Broken. iOS: Uninstall Protection.
   - **Stricter-only edits** of a running session: add targets, extend, raise Strictness; for Delayed and Locked sessions, removals, shortening and lowering are refused or deferred. Normal sessions are exempt and can be edited freely (ADR 0007).
 - **Schedules**: days, start/end (overnight allowed), Block List, Strictness, on/off switch. Start on time with Focal closed (Android exact alarms, iOS DeviceActivity monitor); missed starts catch up and still end at the scheduled end.
-- **Shield**: shown instead of a blocked app or supported-browser website, names the session ("+N more"), time left, a motivational line, and only Close and Open Focal. On a blocked website, Close opens a new tab in the same browser.
-- **Stats and Streaks**: focus time today and this week, outcome counts, current and longest Streak (a day counts with a Completed session of at least 15 minutes), Android Glance home-screen widget.
+- **Shield**: shown instead of a blocked app or supported-browser website, names the session ("+N more"), time left, a motivational line, and only Close and Open Focal. Website Shields are Android-only: Close opens a new tab in the same browser (falling back to Home if the browser refuses). On iOS, websites get the system's restricted page instead.
+- **Stats and Streaks**: focus time today and this week, outcome counts, current and longest Streak (a day counts with a Completed session that blocked for at least 15 minutes; Breaks are subtracted), Android Glance home-screen widget.
 - **Android extras**: OEM battery guidance (Xiaomi, Samsung, Huawei, OnePlus) and a "Why did my session stop?" help entry.
 - **Privacy**: Focal itself transmits nothing: data is stored on the device, with no account, backend or analytics, and no `INTERNET` permission on Android (ADR 0003). OS-managed backups (Android `allowBackup`, iCloud or computer backups) can still copy it, as the [privacy policy](privacy-policy.md) says.
 
