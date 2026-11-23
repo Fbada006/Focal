@@ -1,6 +1,6 @@
 # Focal
 
-Focal is an Opal-style focus app for Android and iOS. It blocks distracting apps and websites during Focus Sessions, started by hand or by Schedules. Kotlin Multiplatform with Compose Multiplatform UI; each platform has its own blocking engine.
+Focal is focus app for Android and iOS. It blocks distracting apps and websites during Focus Sessions, started by hand or by Schedules. Kotlin Multiplatform with Compose Multiplatform UI; each platform has its own blocking engine.
 
 Terms follow [GLOSSARY.md](GLOSSARY.md). Deeper material lives in [docs/specs/v1.md](docs/specs/v1.md), [docs/adr/](docs/adr/), [docs/android-blocking-engine.md](docs/android-blocking-engine.md) and [docs/ios-blocking-engine.md](docs/ios-blocking-engine.md); this page links rather than repeats. It is a tour of v1 as built so far: what it does, how it is put together, what is known to be shaky and what is left.
 
