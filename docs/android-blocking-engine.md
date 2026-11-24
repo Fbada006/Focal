@@ -41,7 +41,7 @@ Known gaps and risks:
 - View IDs are browser internals and change without notice; each needs checking on a device per release. Firefox is moving its toolbar to Compose, which may drop the view ID.
 - Chrome can show search terms instead of the URL on Google results pages ("query in omnibox"), so a blocked `google.com` isn't caught there.
 - In-app browsers (a WebView inside another app) aren't covered. Custom Tabs run under the browser's package and are caught only where their toolbar uses an ID in the table (Samsung's is listed; Chrome's needs checking on a device).
-- **`UsageStatsManager`** (usage access) is *not* a blocking signal — polling `queryEvents` for `ACTIVITY_RESUMED` is too slow. Possible later uses: fallback when accessibility is off, a cross-check, and per-app screen-time stats. Not needed for v1 unless stats require it.
+- **`UsageStatsManager`** (usage access) is *not* a blocking signal — polling `queryEvents` for `ACTIVITY_RESUMED` is too slow. It is used only to rank the Apps tab's suggestions by the last 7 days of foreground time (T37, story 16a). The permission is optional; without it the list stays alphabetical.
 
 ### App Categories
 

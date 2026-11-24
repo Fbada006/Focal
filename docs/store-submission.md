@@ -26,9 +26,10 @@ Related drafts: [privacy policy](privacy-policy.md), [store listing copy](store-
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` | `RunningSessionService` |
 | `RECEIVE_BOOT_COMPLETED` | Re-apply running Focus Sessions and re-arm Schedule alarms after reboot or app update |
 | `SCHEDULE_EXACT_ALARM` | Start and end Schedules on time |
+| `PACKAGE_USAGE_STATS` (app-op, optional) | Rank the Apps tab's suggestions by the last 7 days of system usage; the user grants it in Usage access |
 | `BIND_ACCESSIBILITY_SERVICE` (on the service) | Foreground app and browser address-bar detection |
 
-Not declared, on purpose: `QUERY_ALL_PACKAGES`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, `USE_EXACT_ALARM`, `SYSTEM_ALERT_WINDOW`, `PACKAGE_USAGE_STATS`, `INTERNET`.
+Not declared, on purpose: `QUERY_ALL_PACKAGES`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, `USE_EXACT_ALARM`, `SYSTEM_ALERT_WINDOW`, `INTERNET`.
 
 ### 1.2 Accessibility API declaration (Permissions declaration form)
 
@@ -120,7 +121,7 @@ Notes for the human:
 - **`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`**: not requested. Play restricts it. Focal instead opens the system battery-optimisation settings screen and shows OEM-specific guidance (autostart on Xiaomi, "sleeping apps" on Samsung) in a "Why did my session stop?" help entry (T35). The user decides.
 - **`USE_EXACT_ALARM`**: not used (alarm-clock and calendar apps only).
 - **`SYSTEM_ALERT_WINDOW`**: not needed; the Shield is an accessibility overlay.
-- **`PACKAGE_USAGE_STATS`**: not a blocking signal and not needed in v1.
+- **`PACKAGE_USAGE_STATS`**: optional and used only to rank Apps-tab suggestions by recent foreground time. It is not a blocking signal; without it the tab lists apps alphabetically. The data stays on the device (story 16a).
 
 ### 1.9 Play submission checklist
 

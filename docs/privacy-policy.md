@@ -23,6 +23,8 @@ This data never leaves your device through Focal. If you delete Focal, this data
 
 **iOS.** Focal uses Apple's Screen Time frameworks (FamilyControls, ManagedSettings, DeviceActivity) with your approval. The apps and App Categories you pick in Apple's picker come back to Focal as opaque tokens that stay on your device; Focal cannot tell which apps they are, or which apps you used or for how long. Websites are different: you type them as domain names (for example `example.com`), so Focal stores those readable domains in your Block Lists, on your device only, and hands them to Screen Time to block.
 
+**Android app suggestions.** If you allow usage access, Focal reads Android's own app usage for the last 7 days to rank the apps you use most at the top of the Apps tab, with a note saying so. It reads only which launchable apps were in the foreground and for how long. That information is used on the device to order the list and is not saved, sent or shared.
+
 ## Permissions
 
 - **Accessibility (Android):** to detect blocked apps and websites, as above.
@@ -30,6 +32,7 @@ This data never leaves your device through Focal. If you delete Focal, this data
 - **Notifications (iOS):** only so that tapping "Open Focal" on the Shield can show a notification you tap to return to Focal.
 - No marketing notifications on either platform.
 - **Exact alarms (Android):** to start and end your Schedules on time.
+- **Usage access (Android, optional):** only to rank the app suggestions by what you use most. Focal works without it.
 - **Screen Time access (iOS):** to block the apps and websites you choose.
 
 Focal does not request access to your contacts, location, camera, microphone, photos or files, and does not request network access on Android.
