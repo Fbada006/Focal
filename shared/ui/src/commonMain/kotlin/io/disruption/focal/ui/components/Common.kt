@@ -5,9 +5,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,7 +25,9 @@ fun FocalTopBar(
     TopAppBar(
         title = { Text(title) },
         navigationIcon = {
-            if (onBack != null) TextButton(onClick = onBack) { Text("Back") }
+            if (onBack != null) {
+                IconButton(onClick = onBack) { Icon(BackArrow, contentDescription = "Back") }
+            }
         },
         actions = { actions() },
     )

@@ -55,6 +55,26 @@ class AppPickerViewModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun usageOfAppsThatAreNotListedDoesNotCrowdOutSuggestions() = runTest {
+        // The system reports every package: System UI, the keyboard, Focal itself while picking.
+        val unlisted = listOf(
+            "com.android.systemui",
+            "com.google.android.inputmethod.latin",
+            "io.disruption.focal",
+            "com.google.android.apps.nexuslauncher",
+            "com.android.phone",
+        ).map { AppUsage(it, 5.hours) }
+        val usage = FakeAppUsage(
+            granted = true,
+            used = unlisted + AppUsage("com.zhiliaoapp.musically", 2.hours) + AppUsage("com.instagram.android", 1.hours),
+        )
+
+        val state = vm(usage).state.value
+
+        assertEquals(listOf("TikTok", "Instagram"), state.suggestions.map { it.label })
+    }
+
+    @Test
     fun withoutUsageAccessKeepsTheAlphabeticalListAndOffersAccess() = runTest {
         val usage = FakeAppUsage(granted = false)
 
@@ -194,5 +214,5 @@ private class FakeAppUsage(
         requests++
     }
 
-    override suspend fun mostUsed(days: Int, limit: Int): List<AppUsage> = used.take(limit)
+    override suspend fun mostUsed(days: Int): List<AppUsage> = used
 }

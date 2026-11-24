@@ -44,7 +44,7 @@ class AndroidAppUsage(private val context: Context) : AppUsageSource {
         )
     }
 
-    override suspend fun mostUsed(days: Int, limit: Int): List<AppUsage> = withContext(Dispatchers.IO) {
+    override suspend fun mostUsed(days: Int): List<AppUsage> = withContext(Dispatchers.IO) {
         if (!isGranted()) return@withContext emptyList()
         val manager = context.getSystemService(android.app.usage.UsageStatsManager::class.java)
             ?: return@withContext emptyList()
@@ -58,7 +58,6 @@ class AndroidAppUsage(private val context: Context) : AppUsageSource {
             .filter { it.totalTimeInForeground > 0 }
             .map { AppUsage(it.packageName, it.totalTimeInForeground.milliseconds) }
             .sortedByDescending { it.foreground }
-            .take(limit)
             .toList()
     }
 

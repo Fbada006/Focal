@@ -18,8 +18,9 @@ interface AppUsageSource {
     fun requestAccess()
 
     /**
-     * Launchable apps used since [days] ago, most used first, at most [limit]. Empty when usage
-     * access isn't granted or there is no usage to report.
+     * Every package used since [days] ago, most used first. This includes packages the user can't
+     * pick (System UI, the keyboard, Focal itself), so callers match it against the launchable
+     * apps before capping it. Empty when usage access isn't granted or there is no usage to report.
      */
-    suspend fun mostUsed(days: Int, limit: Int): List<AppUsage>
+    suspend fun mostUsed(days: Int): List<AppUsage>
 }

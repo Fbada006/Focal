@@ -131,20 +131,25 @@ class AppPickerViewModel(
 
     private suspend fun readUsage(): UsageRanking {
         if (!usage.isGranted()) return UsageRanking(granted = false)
-        val packages = usage.mostUsed(USAGE_DAYS, SUGGESTION_LIMIT).map { it.packageName }
+        val packages = usage.mostUsed(USAGE_DAYS).map { it.packageName }
         return UsageRanking(granted = true, packages = packages)
     }
 
-    /** Installed apps in the system's order, so an app that isn't installed is simply skipped. */
+    /**
+     * Installed apps in the system's order. Packages that aren't launchable apps are skipped before
+     * the cap, so System UI or Focal itself never take a suggestion slot.
+     */
     private fun rankedSuggestions(
         apps: List<InstalledApp>,
         ranking: UsageRanking,
         selection: Set<String>,
     ): List<AppRow> {
         if (!ranking.granted) return emptyList()
-        return ranking.packages.mapNotNull { packageName ->
-            apps.firstOrNull { it.packageName == packageName }?.let { row(it, selection) }
-        }
+        val byPackage = apps.associateBy { it.packageName }
+        return ranking.packages
+            .mapNotNull { byPackage[it] }
+            .take(SUGGESTION_LIMIT)
+            .map { row(it, selection) }
     }
 
     /** ADR 0007: a removal a running session defers must say so (story 48). */
