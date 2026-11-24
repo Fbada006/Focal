@@ -1,6 +1,8 @@
 package io.disruption.focal.ui.apps
 
 import io.disruption.focal.core.apps.AppCategoryResolver
+import io.disruption.focal.core.apps.AppUsage
+import io.disruption.focal.core.apps.AppUsageSource
 import io.disruption.focal.core.apps.InstalledApp
 import io.disruption.focal.core.apps.InstalledAppsSource
 import io.disruption.focal.ui.MainDispatcherTest
@@ -25,13 +27,67 @@ class AppPickerViewModelTest : MainDispatcherTest() {
         )
     }
 
-    private fun vm() = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, AppCategoryResolver(emptyMap()))
+    private fun vm(usage: AppUsageSource = FakeAppUsage()) =
+        AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, AppCategoryResolver(emptyMap()), usage)
 
     @Test
     fun listsInstalledAppsWithSelectedOnesFirst() = runTest {
         val apps = vm().state.value.apps
         assertEquals(listOf("Instagram", "Chrome", "TikTok"), apps.map { it.label })
         assertEquals(listOf(true, false, false), apps.map { it.selected })
+    }
+
+    @Test
+    fun ranksMostUsedAppsFirstWithAUsageNote() = runTest {
+        val usage = FakeAppUsage(
+            granted = true,
+            used = listOf(
+                AppUsage("com.zhiliaoapp.musically", 2.hours),
+                AppUsage("com.instagram.android", 1.hours),
+            ),
+        )
+
+        val state = vm(usage).state.value
+
+        assertEquals(listOf("TikTok", "Instagram"), state.suggestions.map { it.label })
+        assertEquals("Suggested from your device's usage over the last 7 days.", state.usageNote)
+        assertEquals(listOf("Chrome"), state.apps.map { it.label })
+    }
+
+    @Test
+    fun withoutUsageAccessKeepsTheAlphabeticalListAndOffersAccess() = runTest {
+        val usage = FakeAppUsage(granted = false)
+
+        val vm = vm(usage)
+        assertEquals(emptyList(), vm.state.value.suggestions)
+        assertEquals(null, vm.state.value.usageNote)
+        assertEquals(listOf("Instagram", "Chrome", "TikTok"), vm.state.value.apps.map { it.label })
+
+        vm.onIntent(AppPickerIntent.UsageAccessRequested)
+        assertEquals(1, usage.requests)
+    }
+
+    @Test
+    fun checkingUsageAccessAgainLoadsTheRanking() = runTest {
+        val usage = FakeAppUsage(granted = false)
+        val vm = vm(usage)
+
+        usage.granted = true
+        usage.used = listOf(AppUsage("com.zhiliaoapp.musically", 1.hours))
+        vm.onIntent(AppPickerIntent.UsageAccessChecked)
+
+        assertEquals(listOf("TikTok"), vm.state.value.suggestions.map { it.label })
+    }
+
+    @Test
+    fun searchingShowsEveryMatchingAppIncludingSuggestions() = runTest {
+        val usage = FakeAppUsage(granted = true, used = listOf(AppUsage("com.zhiliaoapp.musically", 1.hours)))
+        val vm = vm(usage)
+
+        vm.onIntent(AppPickerIntent.QueryChanged("tik"))
+
+        assertEquals(emptyList(), vm.state.value.suggestions)
+        assertEquals(listOf("TikTok"), vm.state.value.apps.map { it.label })
     }
 
     @Test
@@ -81,7 +137,7 @@ class AppPickerSuggestionsTest : MainDispatcherTest() {
 
     @Test
     fun pickingAnAppPreselectsItsSuggestedWebsites() = runTest {
-        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, AppCategoryResolver(emptyMap()))
+        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, AppCategoryResolver(emptyMap()), FakeAppUsage())
         vm.onIntent(AppPickerIntent.Toggled("com.google.android.youtube"))
         vm.onIntent(AppPickerIntent.Toggled("com.android.chrome"))
 
@@ -90,7 +146,7 @@ class AppPickerSuggestionsTest : MainDispatcherTest() {
 
     @Test
     fun unpickingAnAppKeepsItsWebsites() = runTest {
-        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, AppCategoryResolver(emptyMap()))
+        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, AppCategoryResolver(emptyMap()), FakeAppUsage())
         vm.onIntent(AppPickerIntent.Toggled("com.google.android.youtube"))
         vm.onIntent(AppPickerIntent.Toggled("com.google.android.youtube"))
 
@@ -111,7 +167,7 @@ class AppCategoriesPickerTest : MainDispatcherTest() {
 
     @Test
     fun showsCategoriesWithInstalledCountsAndSavesPickedOnes() = runTest {
-        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, resolver)
+        val vm = AppPickerViewModel(social.id.value, f.blockLists, installed, FakeSuggestedWebsites, resolver, FakeAppUsage())
         val games = vm.state.value.categories.single { it.key == "games" }
         assertEquals(1, games.installedCount)
         assertEquals("Social", vm.state.value.apps.single { it.label == "Instagram" }.category)
@@ -123,4 +179,20 @@ class AppCategoriesPickerTest : MainDispatcherTest() {
         assertEquals(setOf("games"), f.blockListRepository.get(social.id)!!.blocked.appCategories)
         assertEquals(true, vm.state.value.categories.single { it.key == "games" }.selected)
     }
+}
+
+/** Stand-in for Android's usage stats: tests choose the access state and ranking. */
+private class FakeAppUsage(
+    var granted: Boolean = false,
+    var used: List<AppUsage> = emptyList(),
+) : AppUsageSource {
+    var requests = 0
+
+    override suspend fun isGranted(): Boolean = granted
+
+    override fun requestAccess() {
+        requests++
+    }
+
+    override suspend fun mostUsed(days: Int, limit: Int): List<AppUsage> = used.take(limit)
 }

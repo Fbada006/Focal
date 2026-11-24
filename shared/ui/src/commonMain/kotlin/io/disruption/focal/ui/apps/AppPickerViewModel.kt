@@ -3,6 +3,7 @@ package io.disruption.focal.ui.apps
 import androidx.lifecycle.viewModelScope
 import io.disruption.focal.core.apps.AppCategory
 import io.disruption.focal.core.apps.AppCategoryResolver
+import io.disruption.focal.core.apps.AppUsageSource
 import io.disruption.focal.core.apps.InstalledApp
 import io.disruption.focal.core.apps.InstalledAppsSource
 import io.disruption.focal.core.blocklist.BlockListResult
@@ -30,18 +31,36 @@ data class AppPickerState(
     val notice: String? = null,
     /** Whole App Categories; picking one also covers apps installed later (story 18). */
     val categories: List<CategoryRow> = emptyList(),
+    /** The apps the user uses most, from the system's usage data (story 16a). */
+    val suggestions: List<AppRow> = emptyList(),
+    /** Whether Focal may read usage stats. False shows how to grant it; suggestions stay empty. */
+    val usageAccessGranted: Boolean = false,
+    /** Shown above [suggestions] so the user knows where the order comes from. */
+    val usageNote: String? = null,
 )
 
 sealed interface AppPickerIntent {
     data class QueryChanged(val query: String) : AppPickerIntent
     data class Toggled(val packageName: String) : AppPickerIntent
     data class CategoryToggled(val key: String) : AppPickerIntent
+
+    /** Open the system screen where the optional usage access is granted. */
+    data object UsageAccessRequested : AppPickerIntent
+
+    /** Re-read usage access after returning from that screen. */
+    data object UsageAccessChecked : AppPickerIntent
 }
+
+/** The system's ranking, kept as package names in most-used order. */
+private data class UsageRanking(val granted: Boolean, val packages: List<String> = emptyList())
 
 /**
  * The Android Apps tab: search the installed apps and pick which to block (story 16). Picking an
  * app also selects the matching Suggested Websites, so blocking Instagram the app blocks
  * instagram.com by default (story 22); they can be unticked in the Websites tab.
+ *
+ * The most-used apps come first, ranked from Android's own usage data (story 16a). Usage access is
+ * optional: without it the list is alphabetical and the tab explains how to grant it.
  */
 class AppPickerViewModel(
     blockListId: String,
@@ -49,20 +68,28 @@ class AppPickerViewModel(
     private val installedApps: InstalledAppsSource,
     private val suggested: SuggestedWebsitesCatalog,
     private val categories: AppCategoryResolver,
+    private val usage: AppUsageSource,
 ) : MviViewModel<AppPickerState, AppPickerIntent, Nothing>(AppPickerState()) {
     private val id = BlockListId(blockListId)
     private val installed = MutableStateFlow<List<InstalledApp>?>(null)
     private val query = MutableStateFlow("")
     private val notice = MutableStateFlow<String?>(null)
+    private val ranking = MutableStateFlow(UsageRanking(granted = false))
+
     init {
         viewModelScope.launch { installed.value = installedApps.launchableApps() }
+        viewModelScope.launch { ranking.value = readUsage() }
         viewModelScope.launch {
             val blocked = blockLists.observeAll().mapNotNull { lists -> lists.firstOrNull { it.id == id }?.blocked }
-            combine(installed, query, blocked, notice) { apps, query, blocked, notice ->
+            combine(installed, query, blocked, notice, ranking) { apps, query, blocked, notice, ranking ->
+                val installed = apps.orEmpty()
+                // A search covers every app; suggestions only make sense in the unfiltered list.
+                val ranked = if (query.isBlank()) rankedSuggestions(installed, ranking, blocked.apps) else emptyList()
+                val suggestedPackages = ranked.mapTo(mutableSetOf()) { it.packageName }
                 AppPickerState(
                     loading = apps == null,
                     query = query,
-                    apps = rows(apps.orEmpty(), query, blocked.apps),
+                    apps = rows(installed, query, blocked.apps, excluded = suggestedPackages),
                     selectedCount = blocked.apps.size,
                     notice = notice,
                     categories = AppCategory.entries.map { category ->
@@ -70,9 +97,12 @@ class AppPickerViewModel(
                             key = category.key,
                             label = category.label,
                             selected = category.key in blocked.appCategories,
-                            installedCount = apps.orEmpty().count { categoryOf(it) == category },
+                            installedCount = installed.count { categoryOf(it) == category },
                         )
                     },
+                    suggestions = ranked,
+                    usageAccessGranted = ranking.granted,
+                    usageNote = if (ranking.granted && ranked.isNotEmpty()) USAGE_NOTE else null,
                 )
             }.collect { state -> setState { state } }
         }
@@ -94,6 +124,26 @@ class AppPickerViewModel(
                     if (domains.isNotEmpty()) blockLists.addDomains(id, domains)
                 }
             }
+            AppPickerIntent.UsageAccessRequested -> usage.requestAccess()
+            AppPickerIntent.UsageAccessChecked -> viewModelScope.launch { ranking.value = readUsage() }
+        }
+    }
+
+    private suspend fun readUsage(): UsageRanking {
+        if (!usage.isGranted()) return UsageRanking(granted = false)
+        val packages = usage.mostUsed(USAGE_DAYS, SUGGESTION_LIMIT).map { it.packageName }
+        return UsageRanking(granted = true, packages = packages)
+    }
+
+    /** Installed apps in the system's order, so an app that isn't installed is simply skipped. */
+    private fun rankedSuggestions(
+        apps: List<InstalledApp>,
+        ranking: UsageRanking,
+        selection: Set<String>,
+    ): List<AppRow> {
+        if (!ranking.granted) return emptyList()
+        return ranking.packages.mapNotNull { packageName ->
+            apps.firstOrNull { it.packageName == packageName }?.let { row(it, selection) }
         }
     }
 
@@ -102,12 +152,26 @@ class AppPickerViewModel(
         if (sessionNames.isNotEmpty()) notice.value = deferredMessage(sessionNames)
     }
     private fun categoryOf(app: InstalledApp) = categories.categoryOf(app.packageName, app.systemCategory)
+    private fun row(app: InstalledApp, selection: Set<String>) =
+        AppRow(app.packageName, app.label, app.packageName in selection, categoryOf(app)?.label)
 
-    private fun rows(apps: List<InstalledApp>, query: String, selection: Set<String>): List<AppRow> {
+    private fun rows(
+        apps: List<InstalledApp>,
+        query: String,
+        selection: Set<String>,
+        excluded: Set<String> = emptySet(),
+    ): List<AppRow> {
         val needle = query.trim()
         return apps
+            .filter { it.packageName !in excluded }
             .filter { needle.isEmpty() || it.label.contains(needle, ignoreCase = true) }
             .map { AppRow(it.packageName, it.label, it.packageName in selection, categoryOf(it)?.label) }
             .sortedWith(compareByDescending<AppRow> { it.selected }.thenBy { it.label.lowercase() })
+    }
+
+    private companion object {
+        const val USAGE_DAYS = 7
+        const val SUGGESTION_LIMIT = 5
+        const val USAGE_NOTE = "Suggested from your device's usage over the last 7 days."
     }
 }
